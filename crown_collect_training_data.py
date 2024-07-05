@@ -50,7 +50,6 @@ output = pd.DataFrame()     # all streamed data
 data_stream = {}           # dictionary for each data packet
 
 
-
 def main():
 
     trial = input("Trial type - 'control' or 'raise left hand': ")
