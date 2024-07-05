@@ -7,6 +7,7 @@ import os
 from dotenv import load_dotenv
 import pandas as pd
 import json
+from datetime import datetime
 import numpy as np
 import time
 
@@ -52,6 +53,8 @@ data_stream = {}           # dictionary for each data packet
 
 def main():
 
+    trial = input("Trial type - 'control' or 'raise left hand': ")
+
     neurosity = initialise()
 
     def callback(data):
@@ -78,7 +81,7 @@ def main():
         if iter >= 48:
             result = output.to_dict(orient='list')
             # Save to JSON
-            with open('data.json', 'w') as f:
+            with open(f'{trial} {datetime.now()}.json', 'w') as f:
                 json.dump(result, f, indent=2)
 
             unsubscribe()
