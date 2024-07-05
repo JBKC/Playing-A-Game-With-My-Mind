@@ -121,7 +121,7 @@ def callback(data, params, channel):
     signals = data['data']
     channels = data['info']['channelNames']
 
-    # pull specialised channel data
+    # pull specified channel data
     i = channels.index(channel)
     data_stream[channel] = signals[i]
 
