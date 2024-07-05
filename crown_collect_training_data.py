@@ -1,5 +1,5 @@
 '''
-File to map EEG kinetic thought training to button outputs
+File create EEG training data for classification
 '''
 
 from neurosity import NeurositySDK
