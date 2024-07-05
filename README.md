@@ -1,1 +1,1 @@
-Translating EEG Signals into Button Presses
+Translating EEG signals to button presses using the Neurosity Crown
