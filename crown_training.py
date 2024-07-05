@@ -5,6 +5,8 @@ File to map EEG kinetic thought training to button outputs
 from neurosity import NeurositySDK
 import os
 from dotenv import load_dotenv
+import pandas as pd
+import numpy as np
 import time
 
 # Load environment variables
@@ -41,43 +43,33 @@ def initialise():
 
 ################################
 
-def training_setup(neurosity):
-    metric = "kinesis"
-    label = "leftArm"
+iter = 0                        # loop counter
+# band 1 = 8-12Hz, band 2 = 13-24Hz, band 3 = 25-30Hz
+# therefore 3 bands * 8 electrodes = 24 feature vectors in total
+band_idx = {
+    'band_1': [4, 5, 6],
+    'band_2': [7, 8, 9, 10, 11, 12],
+    'band_3': [13, 14, 15],
+}
 
-    training_options = {
-        "metric": metric,
-        "label": label,
-        "experimentId": "-training-1"
-    }
+def callback(data):
 
-    # set up kinesis training + predictions
-    def kinesis_callback(kinesis):
-        print("leftArm kinesis detection", kinesis)
-    def predictions_callback(prediction):
-        print("leftArm prediction", prediction)
+    global iter, band_idx
 
-    neurosity.kinesis(label).subscribe(kinesis_callback)
-    neurosity.predictions(label).subscribe(predictions_callback)
+    # get PSD feature vectors
+    for electrode in data['psd']:
+        psd_1 = [electrode[i] for i in band_idx['band_1']]
+        psd_2 = [electrode[i] for i in band_idx['band_2']]
+        psd_3 = [electrode[i] for i in band_idx['band_3']]
 
-    # Tell the user to clear their mind
-    print("Clear your mind and relax")
+    iter += 1
+    print(f"Iteration: {iter}")
 
-    # Tag baseline after a couple seconds
-    time.sleep(4)
-    neurosity.training.record({**training_options, "baseline": True})
-
-    # Now tell the user to imagine an active thought
-    print("Imagine a baseball with your left arm")
-
-    # Tell the user to imagine active thought and fit
-    time.sleep(4)
-    neurosity.training.record({**training_options, "fit": True})
 
 
 def main():
     neurosity = initialise()
-    training_setup(neurosity)
+    neurosity.brainwaves_psd(callback)
 
 if __name__ == '__main__':
     main()
