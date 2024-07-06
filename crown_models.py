@@ -2,6 +2,9 @@
 Run a range of ML models on power data from Crown
 Tests a range of hyperparameters using nested cross validation
 Data extracted from JSON files (via crown_processing.py)
+
+CLASS 1 = raise right arm
+CLASS 2 = raise left arm
 '''
 
 import pandas as pd
@@ -41,7 +44,7 @@ class Processing:
             class_weighting - split between classes (returned as a list with length = num of classes)
         '''
 
-        P1, P2 = crown_processing.main()                # pull data from processing file
+        _,_,_,_,P1,P2 = crown_processing.main()                # pull data from processing file
 
         # x = features, y = classification labels (0 or 1)
         X = np.concatenate((P1, P2), axis=0)                                    # training data
@@ -439,10 +442,10 @@ class LinearDiscriminant(BaseModel):
         Z = Z.reshape(xx.shape)
 
         contour = plt.contourf(xx, yy, Z, cmap=plt.cm.coolwarm, alpha=0.8)  # plot probability gradient
-        plt.colorbar(contour, label='Class 1 Probability')
+        plt.colorbar(contour, label='Class 2 Probability')
 
-        plt.scatter(X_train_2d[y_train == 0, 0], X_train_2d[y_train == 0, 1], c='blue', edgecolor='k', label='Class 0')
-        plt.scatter(X_train_2d[y_train == 1, 0], X_train_2d[y_train == 1, 1], c='red', edgecolor='k', label='Class 1')
+        plt.scatter(X_train_2d[y_train == 0, 0], X_train_2d[y_train == 0, 1], c='blue', edgecolor='k', label='Class 1')
+        plt.scatter(X_train_2d[y_train == 1, 0], X_train_2d[y_train == 1, 1], c='red', edgecolor='k', label='Class 2')
         plt.xlabel('PCA Component 1')
         plt.ylabel('PCA Component 2')
         plt.legend()
@@ -466,10 +469,10 @@ class GaussianNaiveBayes(BaseModel):
         Z = Z.reshape(xx.shape)
 
         contour = plt.contourf(xx, yy, Z, cmap=plt.cm.coolwarm, alpha=0.8)
-        plt.colorbar(contour, label='Class 1 Probability')
+        plt.colorbar(contour, label='Class 2 Probability')
 
-        plt.scatter(X_train_2d[y_train == 0, 0], X_train_2d[y_train == 0, 1], c='blue', edgecolor='k', label='Class 0')
-        plt.scatter(X_train_2d[y_train == 1, 0], X_train_2d[y_train == 1, 1], c='red', edgecolor='k', label='Class 1')
+        plt.scatter(X_train_2d[y_train == 0, 0], X_train_2d[y_train == 0, 1], c='blue', edgecolor='k', label='Class 1')
+        plt.scatter(X_train_2d[y_train == 1, 0], X_train_2d[y_train == 1, 1], c='red', edgecolor='k', label='Class 2')
         plt.xlabel('PCA Component 1')
         plt.ylabel('PCA Component 2')
 
@@ -494,14 +497,14 @@ class GaussianProcessC(BaseModel):
 
         plt.figure(figsize=(8, 6))
         contour = plt.contourf(xx, yy, Z, alpha=0.8, cmap='coolwarm')
-        plt.colorbar(contour, label='Class 1 Probability')
+        plt.colorbar(contour, label='Class 2 Probability')
         # plot 0.5 contour
         contour_lines = plt.contour(xx, yy, Z, levels=[0.5], colors='k', linestyles='--')
         plt.clabel(contour_lines, fmt={0.5: '0.5'}, inline=True, fontsize=10)
 
         plt.scatter(X_train_2d[y_train == 0, 0], X_train_2d[y_train == 0, 1], c='blue', edgecolor='k', label='0')
         plt.scatter(X_train_2d[y_train == 1, 0], X_train_2d[y_train == 1, 1], c='red', edgecolor='k', label='1')
-        plt.title('Predicted Class 1 Probabilities')
+        plt.title('Predicted Class 2 Probabilities')
         plt.xlabel('PCA Component 1')
         plt.ylabel('PCA Component 2')
         plt.legend()

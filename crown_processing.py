@@ -7,6 +7,7 @@ from scipy.signal import butter, filtfilt
 import numpy as np
 import scipy.linalg as la
 import os
+from sklearn.covariance import MinCovDet
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -25,6 +26,7 @@ def whiten(X1, X2):
 
     # get overall covariance matrix
     X = np.concatenate((X1, X2), axis=0)
+
     SX = np.mean([np.cov(trial) for trial in X], axis=0)        # both classes covariance matrix
 
     # eigendecomposition
@@ -78,9 +80,7 @@ def csp(X1, X2, k):
     X1_CSP = np.array([np.dot(V_CSP, trial) for trial in X1])
     X2_CSP = np.array([np.dot(V_CSP, trial) for trial in X2])
 
-    return X1_CSP, X2_CSP
-
-
+    return X1, X2, X1_CSP, X2_CSP
 
 
 def main():
@@ -139,11 +139,31 @@ def main():
                     X2 = np.append(X2, trial_data.reshape(1, *trial_data.shape), axis=0)
 
     # pass through spatial filters
-    X1, X2 = csp(X1=X1, X2=X2, k=k)
+    W1, W2, X1_CSP, X2_CSP = csp(X1=X1, X2=X2, k=k)
 
     # return power
-    return compute_power(X1), compute_power(X2)
+    return compute_power(X1), compute_power(X2), compute_power(W1), compute_power(W2), compute_power(X1_CSP), compute_power(X2_CSP)
 
 
 if __name__ == '__main__':
-    main()
+    PX1, PX2, PW1, PW2, PX1CSP, PX2CSP = main()
+
+    # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+    #
+    # # plot pre-CSP data
+    # for i in PX1:
+    #     ax1.scatter(i[0],i[3],color='red',label='class 1')
+    # for j in PX2:
+    #     ax1.scatter(j[0],j[3],color='blue',label='class 2')
+    # ax1.set_title('Raw data')
+    #
+    # # plot whitened data
+    # for i in PW1:
+    #     ax2.scatter(i[0],i[1],color='red',label='class 1')
+    # for j in PW2:
+    #     ax2.scatter(j[0],j[1],color='blue',label='class 2')
+    # ax2.set_title('Whitened')
+    #
+    # plt.show()
+
+
