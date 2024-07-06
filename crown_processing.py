@@ -78,6 +78,10 @@ def csp(X1, X2, k):
     return X1_CSP, X2_CSP
 
 
+def compute_power(tensor):
+    # take log of power across each CSP, resulting in shape (no. of trials, no. of CSP)
+    return np.log(np.mean(np.abs(tensor)**2, axis=2))
+
 def main():
 
     k = 3
@@ -136,10 +140,9 @@ def main():
     # pass through spatial filters
     X1, X2 = csp(X1=X1, X2=X2, k=k)
 
-    print(X1.shape)
-    print(X1.shape)
-
     # compute power
+    P1 = compute_power(X1)
+    P2 = compute_power(X2)
 
 
     return
