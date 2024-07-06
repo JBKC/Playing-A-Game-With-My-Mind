@@ -15,6 +15,7 @@ from sklearn.svm import SVC
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.impute import SimpleImputer
+from sklearn.covariance import LedoitWolf, OAS, ShrunkCovariance
 from sklearn.model_selection import train_test_split, GridSearchCV, KFold
 from sklearn.decomposition import PCA
 from sklearn.metrics import roc_curve, roc_auc_score
@@ -22,7 +23,7 @@ from sklearn.gaussian_process import GaussianProcessClassifier
 from sklearn.gaussian_process.kernels import RBF, ConstantKernel as C, WhiteKernel
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import accuracy_score
-from sklearn.discriminant_analysis import QuadraticDiscriminantAnalysis
+from sklearn.discriminant_analysis import LinearDiscriminantAnalysis
 from sklearn.naive_bayes import GaussianNB
 from sklearn.base import BaseEstimator, ClassifierMixin
 
@@ -150,7 +151,7 @@ class Training:
         for train_ix, test_ix in cv_outer.split(X_train):
             # create outer kfold splits for the data
             X_train_val, X_test_val = X_train[train_ix], X_train[test_ix]
-            y_train_val, y_test_val = y_train.iloc[train_ix], y_train.iloc[test_ix]
+            y_train_val, y_test_val = y_train[train_ix], y_train[test_ix]
 
             # run inner kfold cross validation to get the best hyperparameters
             params = Training.hyperparameters(model=model_type, X_train=X_train_val, y_train=y_train_val)
@@ -182,8 +183,8 @@ class Training:
             model = RandomForestClassifier(**final_hypers)
         if model_type == 'knn':
             model = KNeighborsClassifier(**final_hypers)
-        if model_type == 'qda':
-            model = QuadraticDiscriminantAnalysis(**final_hypers)
+        if model_type == 'lda':
+            model = LinearDiscriminantAnalysis(**final_hypers)
         if model_type == 'gaussian_nb':
             model = GaussianNB(**final_hypers)
         if model_type == 'gaussian_pc':
@@ -244,14 +245,25 @@ class Training:
             }
             grid_search = GridSearchCV(KNeighborsClassifier(), param_grid, cv=5, verbose=2, n_jobs=-1, scoring='accuracy', return_train_score=True)
 
-        # Quadratic Discriminant Analysis
-        if model == 'qda':
+        # Linear Discriminant Analysis
+        if model == 'lda':
+
+            # different methods for calculating covariance matrix
+            covariance_estimators = [
+                None,
+                LedoitWolf(),
+                OAS(),
+                ShrunkCovariance(shrinkage=0.1),
+                ShrunkCovariance(shrinkage=0.5),
+                ShrunkCovariance(shrinkage=0.9)
+            ]
+
             param_grid = {
-                'reg_param': list(Processing.frange(0.1, 1.0, 0.1)),    # regularisation parameter
+                'solver': ['svd', 'lsqr', 'eigen'],
+                'covariance_estimator': covariance_estimators,
             }
-            # use more splits (cv parameter) to overcome potentially non-Gaussian underlying data
-            # if this model is a poor fit - replace with LinearDiscriminantAnalysis
-            grid_search = GridSearchCV(QuadraticDiscriminantAnalysis(), param_grid, cv=50, verbose=2, n_jobs=-1,
+
+            grid_search = GridSearchCV(LinearDiscriminantAnalysis(), param_grid, cv=5, verbose=2, n_jobs=-1,
                                        scoring='accuracy', return_train_score=True)
 
         # Gaussian Naive Bayes
@@ -408,10 +420,10 @@ class KNearestNeighbors(BaseModel):
     def plot(self, X_train, y_train, model):
         pass
 
-class QuadraticDiscriminant(BaseModel):
+class LinearDiscriminant(BaseModel):
     def __init__(self):
         super().__init__()
-        self.model_type = 'qda'
+        self.model_type = 'lda'
 
     def plot(self, X_train, y_train, model):
         pca = PCA(n_components=2)
@@ -502,7 +514,7 @@ def main():
     '''
     Main function to pick which model to run
     '''
-    model_type = input("Model options: svm, random forest, knn, qda, gaussian nb, gaussian pc\n"
+    model_type = input("Model options: svm, random forest, knn, lda, gaussian nb, gaussian pc\n"
                        "Type model type here: ").strip().lower()
 
     model_functions = {
@@ -511,7 +523,7 @@ def main():
         'gaussian pc': GaussianProcessC,
         'knn': KNearestNeighbors,
         'gaussian nb': GaussianNaiveBayes,
-        'qda': QuadraticDiscriminant
+        'lda': LinearDiscriminant
     }
 
     # Look up and call the corresponding function
