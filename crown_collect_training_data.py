@@ -52,7 +52,7 @@ data_stream = {}           # dictionary for each data packet
 
 def main():
 
-    trial = input("Trial type - 'control' or 'raise left hand': ")
+    trial = input("Trial type - 'raise right hand' or 'raise left hand': ")
 
     neurosity = initialise()
 
