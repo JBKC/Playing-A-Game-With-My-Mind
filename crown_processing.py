@@ -90,7 +90,7 @@ def main():
     X2 = np.empty((0, 0, 0))                     # class 2 data
 
     # pull trials from saved files
-    folder = os.getcwd()
+    folder = "data_3 seconds"
     for trial in os.listdir(folder):
         if trial == '.DS_Store':
             continue

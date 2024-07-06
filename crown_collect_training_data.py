@@ -52,13 +52,17 @@ data_stream = {}           # dictionary for each data packet
 
 def main():
 
-    trial = input("Trial type - 'raise right hand' or 'raise left hand': ")
+    trial = input("Trial type - 'raise right arm' or 'raise left arm': ")
 
     neurosity = initialise()
 
     def callback(data):
 
         global iter, data_stream, output
+
+        trial_time = 3              # in seconds
+        folder = f'data_{trial_time} seconds'
+        os.makedirs(folder, exist_ok=True)
 
         # data_stream['time'] = data['info']['startTime']
         channels = data['info']['channelNames']
@@ -77,10 +81,10 @@ def main():
         print(f'Iteration: {iter}')
         print(output)
 
-        if iter >= 48:
+        if iter >= trial_time * 16:
             result = output.to_dict(orient='list')
             # Save to JSON
-            with open(f'{trial} {datetime.now()}.json', 'w') as f:
+            with open(f'{folder}/{trial}_{trial_time} seconds_{datetime.now()}.json', 'w') as f:
                 json.dump(result, f, indent=2)
 
             unsubscribe()
