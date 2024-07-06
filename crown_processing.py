@@ -5,14 +5,10 @@ Process json data
 import json
 from scipy.signal import butter, filtfilt
 import numpy as np
-from numpy import linalg as la
+import scipy.linalg as la
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
-
-def extract_trials():
-    pass
-
 
 def bpass_filter(data, lowcut, highcut, fs, order=5):
     nyquist = 0.5 * fs
@@ -25,57 +21,68 @@ def normalise(signal):
     # zero mean the signal
     return signal - np.mean(signal)
 
+def whiten(X1, X2):
+
+    # get overall covariance matrix
+    X = np.concatenate((X1, X2), axis=0)
+    SX = np.mean([np.cov(trial) for trial in X], axis=0)        # both classes covariance matrix
+
+    # eigendecomposition
+    D, V = la.eigh(SX)                      # D,V = eigenvalues, eigenvectors
+    idx = np.argsort(D)[::-1]               # sort D,V
+    D = D[idx]
+    V = V[:,idx]
+
+    # return whitening matrix
+    return np.dot(np.diag(np.sqrt(1 / (D + 1e-6))), V.T)
 
 
-def csp(X0, X1, k):
+def csp(X1, X2, k):
     """
     Compute CSP for two classes of EEG data.
 
-    X0, X1: EEG data for class 0 and class 1
+    X1, X2: EEG data for class 1 and class 2
             Shape: (n_trials, n_channels, n_samples)
             trials = number of individual recordings
             channels = 4 (C3,C4,PC3,PC4)
             samples = 768 datapoints
     k: number of top and bottom eigenvectors
     """
-    # compute covariance matrices
-    cov1 = np.mean([np.cov(trial) for trial in X0], axis=0)
-    cov2 = np.mean([np.cov(trial) for trial in X1], axis=0)
+    # get covariance matrices across channels for each trial, then average across trials for each class
+    S1 = np.mean([np.cov(trial) for trial in X1], axis=0)       # class 1 covariance matrix
+    S2 = np.mean([np.cov(trial) for trial in X2], axis=0)       # class 2 covariance matrix
 
-    # get composite covariance + do eigendecomposition
-    cov_comp = cov1 + cov2
-    eig_values, eig_vectors = la.eigh(cov_comp)
-    # sort eigs
-    idx = np.argsort(eig_values)[::-1]
-    eig_values, eig_vectors = eig_values[idx], eig_vectors[:, idx]
+    # get whitening matrix
+    W = whiten(X1,X2)
 
-    # whitening transformation
-    W = np.dot(np.diag(np.sqrt(1/(eig_values + 1e-6))), eig_vectors.T)
-    print(W.shape)
+    # whiten data
+    X1 = np.einsum('ij,kjl->kil', W.T, X1)
+    X2 = np.einsum('ij,kjl->kil', W.T, X2)
 
-    # calculate spatial filters
-    S1 = np.dot(np.dot(cov1, W.T), W)
-    S2 = np.dot(np.dot(cov2, W.T), W)
+    # whiten individual covariance matrices
+    S1 = np.dot(np.dot(W.T, S1), W)
+    S2 = np.dot(np.dot(W.T, S2), W)
 
-    # generalised eigendecomposition
-    eig_values, eig_vectors = np.linalg.eigh(S1, S1 + S2)           # key line that maximises variances for one class and minimises for the other
-    idx = np.argsort(eig_values)[::-1]
-    eig_values, eig_vectors = eig_values[idx], eig_vectors[:, idx]
+    # solve generalised eigenvalue problem to get spatial filters
+    D, V = la.eigh(S1, S1+S2)
+    idx = np.argsort(D)[::-1]               # sort D,V
+    V = V[:,idx]                            # eigenvectors = spatial filters
 
-    # full CSP projection matrix
-    W_csp = np.dot(eig_vectors.T, W)
+    # select k most important eigenvectors
+    V_CSP = np.concatenate((V[:, :k], V[:, -k:]), axis=1).T
 
-    # Select top CSP components
-    W_csp = np.concatenate((W_csp[:, :k], W_csp[:, -k:]), axis=1)
+    # project data
+    X1_CSP = np.array([np.dot(V_CSP, trial) for trial in X1])
+    X2_CSP = np.array([np.dot(V_CSP, trial) for trial in X2])
 
-    return W_csp
+    return X1_CSP, X2_CSP
 
 
 def main():
 
     k = 3
-    X0 = np.empty((0, 0, 0))                     # class 0 data
     X1 = np.empty((0, 0, 0))                     # class 1 data
+    X2 = np.empty((0, 0, 0))                     # class 2 data
 
     # pull trials from saved files
     folder = os.getcwd()
@@ -83,8 +90,8 @@ def main():
         if trial == '.DS_Store':
             continue
 
-        # class 0 = relaxed state, class 1 = motor imagery
-        if 'raise right hand' in trial:
+        # class 1 = relaxed state, class 2 = motor imagery
+        if 'control' in trial:
             print(os.path.splitext(trial)[0])
             with open(os.path.join(folder, trial), 'r') as f:
                 data = json.load(f)
@@ -99,12 +106,12 @@ def main():
                 # 2D array of size (no. of channels, length of signal)
                 trial_data = np.array(trial_data)
 
-                # If X0 is empty, initialize it with the shape of the first trial
-                if X0.size == 0:
-                    X0 = trial_data.reshape(1, *trial_data.shape)
+                # If X1 is empty, initialize it with the shape of the first trial
+                if X1.size == 0:
+                    X1 = trial_data.reshape(1, *trial_data.shape)
                 else:
                     # Append the new trial along axis=0
-                    X0 = np.append(X0, trial_data.reshape(1, *trial_data.shape), axis=0)
+                    X1 = np.append(X1, trial_data.reshape(1, *trial_data.shape), axis=0)
 
         if 'raise left hand' in trial:
             print(os.path.splitext(trial)[0])
@@ -120,14 +127,20 @@ def main():
 
                 trial_data = np.array(trial_data)
 
-                if X1.size == 0:
-                    X1 = trial_data.reshape(1, *trial_data.shape)
+                if X2.size == 0:
+                    X2 = trial_data.reshape(1, *trial_data.shape)
                 else:
                     # Append the new trial along axis=0
-                    X1 = np.append(X1, trial_data.reshape(1, *trial_data.shape), axis=0)
+                    X2 = np.append(X2, trial_data.reshape(1, *trial_data.shape), axis=0)
 
-    # print(X0.shape)
-    csp(X0=X0, X1=X1, k=k)
+    # pass through spatial filters
+    X1, X2 = csp(X1=X1, X2=X2, k=k)
+
+    print(X1.shape)
+    print(X1.shape)
+
+    # compute power
+
 
     return
 
