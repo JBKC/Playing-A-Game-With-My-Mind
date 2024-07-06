@@ -1,7 +1,7 @@
 '''
 Run a range of ML models on power data from Crown
 Tests a range of hyperparameters using nested cross validation
-Data extracted from JSON files
+Data extracted from JSON files (via crown_processing.py)
 '''
 
 import pandas as pd
@@ -37,7 +37,6 @@ class Processing:
         :return:
             X - data
             y - labels
-            sessions - names of sessions (filenames)
             class_weighting - split between classes (returned as a list with length = num of classes)
         '''
 
@@ -124,7 +123,7 @@ class Training:
     '''
 
     @staticmethod
-    def nested_cross_validation(X, y, sessions, model_type):
+    def nested_cross_validation(X, y, model_type):
         '''
         Performs KFold cross validation (CV) training of the selected model
         Consists of an inner CV loop (cross validation for hyperparameter tuning)
@@ -132,7 +131,6 @@ class Training:
 
         :param X: data
         :param y: labels
-        :param sessions: filenames of sessions
         :param model_type: selected model keyword
         :return:
             X_train - final training data
@@ -142,18 +140,8 @@ class Training:
             model - model object
         '''
 
-
         # create final model split (test data to remain for the end)
-        X_train, X_test, y_train, y_test, sessions_train, sessions_test = train_test_split(X, y, sessions, test_size=0.2, random_state=42, stratify=y)
-
-        # deal with errors / missing values
-        imputer = SimpleImputer(strategy='constant', fill_value=0)
-        X_train = imputer.fit_transform(X_train)
-        X_test = imputer.transform(X_test)
-        # standardise features to have zero mean and unit variance
-        scaler = StandardScaler()
-        X_train = scaler.fit_transform(X_train)
-        X_test = scaler.transform(X_test)
+        X_train, X_test, y_train, y_test, = train_test_split(X, y, test_size=0.2, random_state=42, stratify=y)
 
         # define outer CV split
         cv_outer = KFold(n_splits=10, shuffle=True, random_state=42)
@@ -204,7 +192,7 @@ class Training:
             params['max_iter_predict'] = final_hypers['max_iter_predict']
             model = GaussianProcessClassifier(**params)
 
-        Training.run_model(model, X_train, y_train, X_test, y_test, sessions_test)
+        Training.run_model(model, X_train, y_train, X_test, y_test)
 
         return X_train, y_train, X_test, y_test, model
 
@@ -224,7 +212,7 @@ class Training:
             param_grid = {
                 'C': list(Processing.frange(0,1.0,0.1)),                # regularisation parameter
                 'kernel': ['linear', 'poly', 'rbf', 'sigmoid'],                         # type of kernel used
-                'class_weight': ['balanced'],                                           # make up for deficit in one class
+                'class_weight': ['balanced'],                                           # make up for any deficits in one class
                 'degree': list(range(1,6,1)),                                           # only applicable for poly
                 'gamma': list(Processing.frange(0.02,0.05,0.001)),
             }
@@ -322,7 +310,7 @@ class Training:
         return grid_search.best_params_
 
     @staticmethod
-    def run_model(model, X_train, y_train, X_test, y_test, sessions_test):
+    def run_model(model, X_train, y_train, X_test, y_test):
         '''
         Run the selected model
         :param model: name of the model
@@ -330,7 +318,6 @@ class Training:
         :param y_train: array of training classification labels
         :param X_test: array of testing data
         :param y_test: array of testing classification labels
-        :param sessions_test: array of testing session names
         :return accuracy_score(y_test, y_pred): model accuracy score
         '''
 
@@ -345,10 +332,6 @@ class Training:
         cm = confusion_matrix(y_test, y_pred)
         Analysis.confusion(cm)
         Analysis.roc(y_test, y_pred)
-
-        # record misclassified sessions
-        missed = sessions_test[(y_test != y_pred)]
-        missed.to_csv('misclassified_sessions.csv', index=False)
 
         return accuracy_score(y_test, y_pred)
 
