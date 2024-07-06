@@ -36,6 +36,9 @@ def whiten(X1, X2):
     # return whitening matrix
     return np.dot(np.diag(np.sqrt(1 / (D + 1e-6))), V.T)
 
+def compute_power(tensor):
+    # take log of power across each CSP, resulting in shape (no. of trials, no. of CSP)
+    return np.log(np.mean(np.abs(tensor)**2, axis=2) + 1e-10)
 
 def csp(X1, X2, k):
     """
@@ -78,9 +81,7 @@ def csp(X1, X2, k):
     return X1_CSP, X2_CSP
 
 
-def compute_power(tensor):
-    # take log of power across each CSP, resulting in shape (no. of trials, no. of CSP)
-    return np.log(np.mean(np.abs(tensor)**2, axis=2))
+
 
 def main():
 
@@ -95,7 +96,7 @@ def main():
             continue
 
         # class 1 = relaxed state, class 2 = motor imagery
-        if 'control' in trial:
+        if 'raise right arm' in trial:
             print(os.path.splitext(trial)[0])
             with open(os.path.join(folder, trial), 'r') as f:
                 data = json.load(f)
@@ -117,7 +118,7 @@ def main():
                     # Append the new trial along axis=0
                     X1 = np.append(X1, trial_data.reshape(1, *trial_data.shape), axis=0)
 
-        if 'raise left hand' in trial:
+        if 'raise left arm' in trial:
             print(os.path.splitext(trial)[0])
             with open(os.path.join(folder, trial), 'r') as f:
                 data = json.load(f)
@@ -140,12 +141,8 @@ def main():
     # pass through spatial filters
     X1, X2 = csp(X1=X1, X2=X2, k=k)
 
-    # compute power
-    P1 = compute_power(X1)
-    P2 = compute_power(X2)
-
-
-    return
+    # return power
+    return compute_power(X1), compute_power(X2)
 
 
 if __name__ == '__main__':
