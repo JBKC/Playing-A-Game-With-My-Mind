@@ -22,12 +22,23 @@ def normalise(signal):
     # zero mean the signal
     return signal - np.mean(signal)
 
-def whiten(X1, X2):
+def compute_power(tensor):
+    # take log of power across each CSP, resulting in shape (no. of trials, no. of CSP)
+    return np.log(np.mean(np.abs(tensor)**2, axis=2) + 1e-10)
 
-    # get overall covariance matrix
+def whitening_matrix(X1, X2):
+
+    # combine data from both classes
     X = np.concatenate((X1, X2), axis=0)
 
-    SX = np.mean([np.cov(trial) for trial in X], axis=0)        # both classes covariance matrix
+    # compress all features into a single vector giving shape (n_trials, n_channels * n_samples)
+    X = X.reshape((-1, np.prod(X.shape[1:])))
+
+    # centre data
+    X = X - np.mean(X, axis=0)
+
+    # get composite covariance matrix
+    SX = np.dot(X.T, X) / X.shape[0]
 
     # eigendecomposition
     D, V = la.eigh(SX)                      # D,V = eigenvalues, eigenvectors
@@ -38,9 +49,22 @@ def whiten(X1, X2):
     # return whitening matrix
     return np.dot(np.diag(np.sqrt(1 / (D + 1e-6))), V.T)
 
-def compute_power(tensor):
-    # take log of power across each CSP, resulting in shape (no. of trials, no. of CSP)
-    return np.log(np.mean(np.abs(tensor)**2, axis=2) + 1e-10)
+def whiten(x,y,W):
+
+    # reshape
+    x = x.reshape((-1, np.prod(x.shape[1:])))
+    y = y.reshape((-1, np.prod(y.shape[1:])))
+    # whiten
+    x = np.dot(x, W.T)
+    y = np.dot(y, W.T)
+    # revert shape
+    x = x.reshape(25, 4, 768)
+    y = y.reshape(25, 4, 768)
+
+    return x,y
+
+
+
 
 def csp(X1, X2, k):
     """
@@ -53,20 +77,30 @@ def csp(X1, X2, k):
             samples = 768 datapoints
     k: number of top and bottom eigenvectors
     """
-    # get covariance matrices across channels for each trial, then average across trials for each class
-    S1 = np.mean([np.cov(trial) for trial in X1], axis=0)       # class 1 covariance matrix
-    S2 = np.mean([np.cov(trial) for trial in X2], axis=0)       # class 2 covariance matrix
+
+    X1 = X1.reshape((-1, np.prod(X1.shape[1:])))
+    X2 = X2.reshape((-1, np.prod(X2.shape[1:])))
+
+    # get covariance matrices for raw data
+    epsilon = 1e-6
+    S1 = np.dot(X1.T, X1) / X1.shape[0]
+    S2 = np.dot(X2.T, X2) / X2.shape[0]
+    S1 += epsilon * np.eye(S1.shape[0])
+    S2 += epsilon * np.eye(S2.shape[0])
 
     # get whitening matrix
-    W = whiten(X1,X2)
+    W = whitening_matrix(X1,X2)
+    print(f'Whitening matrix shape: {W.shape}')
+    print(W)
+    np.savetxt("W.csv", W, delimiter=",")
+    print(np.count_nonzero(W == 0))
 
     # whiten data
-    X1 = np.einsum('ij,kjl->kil', W.T, X1)
-    X2 = np.einsum('ij,kjl->kil', W.T, X2)
+    X1,X2 = whiten(X1,X2,W)
 
     # whiten individual covariance matrices
-    S1 = np.dot(np.dot(W.T, S1), W)
-    S2 = np.dot(np.dot(W.T, S2), W)
+    S1 = np.dot(S1, W.T)
+    S2 = np.dot(S2, W.T)
 
     # solve generalised eigenvalue problem to get spatial filters
     D, V = la.eigh(S1, S1+S2)
@@ -79,6 +113,8 @@ def csp(X1, X2, k):
     # project data
     X1_CSP = np.array([np.dot(V_CSP, trial) for trial in X1])
     X2_CSP = np.array([np.dot(V_CSP, trial) for trial in X2])
+
+    print(X1_CSP.shape)
 
     return X1, X2, X1_CSP, X2_CSP
 
@@ -148,22 +184,22 @@ def main():
 if __name__ == '__main__':
     PX1, PX2, PW1, PW2, PX1CSP, PX2CSP = main()
 
-    # fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
-    #
-    # # plot pre-CSP data
-    # for i in PX1:
-    #     ax1.scatter(i[0],i[3],color='red',label='class 1')
-    # for j in PX2:
-    #     ax1.scatter(j[0],j[3],color='blue',label='class 2')
-    # ax1.set_title('Raw data')
-    #
-    # # plot whitened data
-    # for i in PW1:
-    #     ax2.scatter(i[0],i[1],color='red',label='class 1')
-    # for j in PW2:
-    #     ax2.scatter(j[0],j[1],color='blue',label='class 2')
-    # ax2.set_title('Whitened')
-    #
-    # plt.show()
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+    # plot pre-CSP data
+    for i in PX1:
+        ax1.scatter(i[0],i[1],color='red',label='class 1')
+    for j in PX2:
+        ax1.scatter(j[0],j[1],color='blue',label='class 2')
+    ax1.set_title('Raw data')
+
+    # plot whitened data
+    for i in PW1:
+        ax2.scatter(i[0],i[1],color='red',label='class 1')
+    for j in PW2:
+        ax2.scatter(j[0],j[1],color='blue',label='class 2')
+    ax2.set_title('Whitened')
+
+    plt.show()
 
 
