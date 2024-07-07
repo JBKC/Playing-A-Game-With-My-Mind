@@ -33,6 +33,7 @@ def whitening_matrix(X1, X2):
 
     # compress all features into a single vector giving shape (n_trials, n_channels * n_samples)
     X = X.reshape((-1, np.prod(X.shape[1:])))
+    print(X.shape)
 
     # centre data
     X = X - np.mean(X, axis=0)
@@ -41,13 +42,14 @@ def whitening_matrix(X1, X2):
     SX = np.dot(X.T, X) / X.shape[0]
 
     # eigendecomposition
-    D, V = la.eigh(SX)                      # D,V = eigenvalues, eigenvectors
+    D, U = la.eig(SX)                       # D,V = eigenvalues, eigenvectors
     idx = np.argsort(D)[::-1]               # sort D,V
     D = D[idx]
-    V = V[:,idx]
+    U = U[:,idx]
 
     # return whitening matrix
-    return np.dot(np.diag(np.sqrt(1 / (D + 1e-6))), V.T)
+    return np.dot(U, np.dot(np.diag(1.0 / np.sqrt(D + 1e-5)), U.T))
+
 
 def whiten(x,y,W):
 
@@ -92,7 +94,6 @@ def csp(X1, X2, k):
     W = whitening_matrix(X1,X2)
     print(f'Whitening matrix shape: {W.shape}')
     print(W)
-    np.savetxt("W.csv", W, delimiter=",")
     print(np.count_nonzero(W == 0))
 
     # whiten data
