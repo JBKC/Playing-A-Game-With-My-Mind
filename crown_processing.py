@@ -33,7 +33,6 @@ def whitening_matrix(X1, X2):
 
     # compress all features into a single vector giving shape (n_trials, n_channels * n_samples)
     X = X.reshape((-1, np.prod(X.shape[1:])))
-    print(X.shape)
 
     # centre data
     X = X - np.mean(X, axis=0)
@@ -41,34 +40,34 @@ def whitening_matrix(X1, X2):
     # get composite covariance matrix
     SX = np.dot(X.T, X) / X.shape[0]
 
-    # eigendecomposition
-    D, U = la.eig(SX)                       # D,V = eigenvalues, eigenvectors
-    idx = np.argsort(D)[::-1]               # sort D,V
-    D = D[idx]
-    U = U[:,idx]
+    # eigendecomposition of composite covariance matrix
+    U, Lambda, _ = np.linalg.svd(SX)
+
+    W = np.dot(U, np.dot(np.diag(1.0 / np.sqrt(Lambda + 1e-5)), U.T))               # ZCA
+    # W = np.dot(np.diag(1.0 / np.sqrt(Lambda + 1e-5)), U.T)                          # PCA
 
     # return whitening matrix
-    return np.dot(U, np.dot(np.diag(1.0 / np.sqrt(D + 1e-5)), U.T))
+    return W
 
 
-def whiten(x,y,W):
+def whiten(X1,X2,W):
 
-    # reshape
-    x = x.reshape((-1, np.prod(x.shape[1:])))
-    y = y.reshape((-1, np.prod(y.shape[1:])))
-    # whiten
-    x = np.dot(x, W.T)
-    y = np.dot(y, W.T)
+    # reshape data
+    X1 = X1.reshape((-1, np.prod(X1.shape[1:])))
+    X2 = X2.reshape((-1, np.prod(X2.shape[1:])))
+
+    # whiten mean-centred data
+    X1 = np.dot(X1 - np.mean(X1, axis=0), W.T)
+    X2 = np.dot(X2 - np.mean(X2, axis=0), W.T)
+
     # revert shape
-    x = x.reshape(25, 4, 768)
-    y = y.reshape(25, 4, 768)
+    X1 = X1.reshape(25, 4, 768)
+    X2 = X2.reshape(25, 4, 768)
 
-    return x,y
-
-
+    return X1,X2
 
 
-def csp(X1, X2, k):
+def csp(X1, X2, W, k):
     """
     Compute CSP for two classes of EEG data.
 
@@ -77,24 +76,19 @@ def csp(X1, X2, k):
             trials = number of individual recordings
             channels = 4 (C3,C4,PC3,PC4)
             samples = 768 datapoints
+    W: whitening matrix
     k: number of top and bottom eigenvectors
     """
 
     X1 = X1.reshape((-1, np.prod(X1.shape[1:])))
     X2 = X2.reshape((-1, np.prod(X2.shape[1:])))
 
-    # get covariance matrices for raw data
+    # get covariance matrices for RAW data
     epsilon = 1e-6
     S1 = np.dot(X1.T, X1) / X1.shape[0]
     S2 = np.dot(X2.T, X2) / X2.shape[0]
     S1 += epsilon * np.eye(S1.shape[0])
     S2 += epsilon * np.eye(S2.shape[0])
-
-    # get whitening matrix
-    W = whitening_matrix(X1,X2)
-    print(f'Whitening matrix shape: {W.shape}')
-    print(W)
-    print(np.count_nonzero(W == 0))
 
     # whiten data
     X1,X2 = whiten(X1,X2,W)
@@ -102,6 +96,13 @@ def csp(X1, X2, k):
     # whiten individual covariance matrices
     S1 = np.dot(S1, W.T)
     S2 = np.dot(S2, W.T)
+    print(f'S1 shape: {S1.shape}')
+    print(f'S2 shape: {S2.shape}')
+
+    S = S1+S2
+    print(S)
+    print(f'S shape: {S.shape}')
+    print(np.count_nonzero(S == 0))
 
     # solve generalised eigenvalue problem to get spatial filters
     D, V = la.eigh(S1, S1+S2)
@@ -117,8 +118,27 @@ def csp(X1, X2, k):
 
     print(X1_CSP.shape)
 
-    return X1, X2, X1_CSP, X2_CSP
+    return X1, X2,
 
+
+def scatter_plots(X1, X2, W1, W2, X1csp, X2csp):
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
+
+    # plot raw data
+    for i in X1:
+        ax1.scatter(i[0], i[1], color='red', label='class 1')
+    for j in X2:
+        ax1.scatter(j[0], j[1], color='blue', label='class 2')
+    ax1.set_title('Raw data')
+
+    # plot CSP data
+    for i in X1csp:
+        ax2.scatter(i[0], i[1], color='red', label='class 1')
+    for j in X2csp:
+        ax2.scatter(j[0], j[1], color='blue', label='class 2')
+    ax2.set_title('Whitened')
+
+    plt.show()
 
 def main():
 
@@ -128,13 +148,14 @@ def main():
 
     # pull trials from saved files
     folder = "data_3 seconds"
+    print(f'Pulling trials...')
+
     for trial in os.listdir(folder):
         if trial == '.DS_Store':
             continue
-
         # class 1 = relaxed state, class 2 = motor imagery
         if 'raise right arm' in trial:
-            print(os.path.splitext(trial)[0])
+            # print(os.path.splitext(trial)[0])
             with open(os.path.join(folder, trial), 'r') as f:
                 data = json.load(f)
 
@@ -156,7 +177,7 @@ def main():
                     X1 = np.append(X1, trial_data.reshape(1, *trial_data.shape), axis=0)
 
         if 'raise left arm' in trial:
-            print(os.path.splitext(trial)[0])
+            # print(os.path.splitext(trial)[0])
             with open(os.path.join(folder, trial), 'r') as f:
                 data = json.load(f)
 
@@ -175,32 +196,28 @@ def main():
                     # Append the new trial along axis=0
                     X2 = np.append(X2, trial_data.reshape(1, *trial_data.shape), axis=0)
 
-    # pass through spatial filters
-    W1, W2, X1_CSP, X2_CSP = csp(X1=X1, X2=X2, k=k)
+    print(f'Number of class 1 trials: {X1.shape[0]}')
+    print(f'Number of class 2 trials: {X2.shape[0]}')
 
-    # return power
-    return compute_power(X1), compute_power(X2), compute_power(W1), compute_power(W2), compute_power(X1_CSP), compute_power(X2_CSP)
+    # get whitening matrix
+    W = whitening_matrix(X1=X1, X2=X2)
+    print(f'Whitening matrix shape: {W.shape}')
+
+    # whiten data
+    W1, W2 = whiten(X1=X1, X2=X2, W=W)
+
+    # pass raw data through spatial filters
+    X1csp, X1csp = csp(X1=X1, X2=X2, W=W, k=k)
+
+    scatter_plots(X1=X1, X2=X2, W1=W1, W2=W2, X1csp=X1csp, X2csp=X2csp)
+
+    # compute power
+    return
 
 
 if __name__ == '__main__':
-    PX1, PX2, PW1, PW2, PX1CSP, PX2CSP = main()
+    main()
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 5))
 
-    # plot pre-CSP data
-    for i in PX1:
-        ax1.scatter(i[0],i[1],color='red',label='class 1')
-    for j in PX2:
-        ax1.scatter(j[0],j[1],color='blue',label='class 2')
-    ax1.set_title('Raw data')
-
-    # plot whitened data
-    for i in PW1:
-        ax2.scatter(i[0],i[1],color='red',label='class 1')
-    for j in PW2:
-        ax2.scatter(j[0],j[1],color='blue',label='class 2')
-    ax2.set_title('Whitened')
-
-    plt.show()
 
 
