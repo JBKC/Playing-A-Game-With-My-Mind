@@ -22,7 +22,9 @@ def bpass_filter(data, lowcut, highcut, fs, order=5):
 
 def normalise(signal):
     # zero mean the signal
-    return signal - np.mean(signal)
+    signal = signal - np.mean(signal)
+    # crop to get rid of edge effects (to update with more elegant method)
+    return signal[100:-100]
 
 def compute_power(X1,X2):
     '''
@@ -41,48 +43,18 @@ def compute_power(X1,X2):
 
     return P1, P2
 
-def whitening_matrix(X1, X2):
-
-    # combine data from both classes
-    X = np.concatenate((X1, X2), axis=0)
-
-    # compress all features into a single vector giving shape (n_trials, n_channels * n_samples)
-    X = X.reshape((-1, np.prod(X.shape[1:])))
-
-    # centre data
-    X = X - np.mean(X, axis=0)
-
-    # get composite covariance matrix
-    SX = np.dot(X.T, X) / X.shape[0]
+def whitening_matrix(SX):
 
     # eigendecomposition of composite covariance matrix
     U, D, _ = np.linalg.svd(SX)
 
-    W = np.dot(U, np.dot(np.diag(1.0 / np.sqrt(D + 1e-5)), U.T))               # ZCA
-    # W = np.dot(np.diag(1.0 / np.sqrt(D + 1e-5)), U.T)                          # PCA
+    # W = np.dot(U, np.dot(np.diag(1.0 / np.sqrt(D + 1e-5)), U.T))               # ZCA
+    W = np.dot(np.diag(1.0 / np.sqrt(D + 1e-5)), U.T)                          # PCA
 
-    # return whitening matrix
     return W
 
 
-def whiten(X1,X2,W):
-
-    # reshape data
-    X1 = X1.reshape((-1, np.prod(X1.shape[1:])))
-    X2 = X2.reshape((-1, np.prod(X2.shape[1:])))
-
-    # whiten mean-centred data
-    X1 = np.dot(X1 - np.mean(X1, axis=0), W.T)
-    X2 = np.dot(X2 - np.mean(X2, axis=0), W.T)
-
-    # revert shape
-    X1 = X1.reshape(25, 4, 768)
-    X2 = X2.reshape(25, 4, 768)
-
-    return X1,X2
-
-
-def csp(X1, X2, W1, W2, W, k):
+def csp(X1, X2, k):
     """
     Compute CSP for two classes of EEG data.
 
@@ -96,57 +68,83 @@ def csp(X1, X2, W1, W2, W, k):
     """
 
     # rehsape data
-    W1 = W1.reshape((-1, np.prod(W1.shape[1:])))
-    W2 = W2.reshape((-1, np.prod(W2.shape[1:])))
+    # W1 = W1.reshape((-1, np.prod(W1.shape[1:])))
+    # W2 = W2.reshape((-1, np.prod(W2.shape[1:])))
 
-    # get covariance matrices
-    S1 = np.dot(W1.T, W1) / W1.shape[0]
-    S2 = np.dot(W2.T, W2) / W2.shape[0]
-    S1 += 1e-6 * np.eye(S1.shape[0])
-    S2 += 1e-6 * np.eye(S2.shape[0])
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 5))
+
+    # calculate covariance matrices
+    S1 = []
+    S2 = []
+
+    for trial in X1:
+        S1.append(np.dot(trial, trial.T))
+    for trial in X2:
+        S2.append(np.dot(trial, trial.T))
+
+    S1 = np.mean(S1, axis=0)
+    S2 = np.mean(S2, axis=0)
+    print(f'Cov shape: {S1.shape}')
+    # should be 4,4
+
+    # get composite covariance matrix
+    SX = S1 + S2
+
+    # get whitening matrix
+    W = whitening_matrix(SX)
+    print(f'Whitening matrix shape: {W.shape}')
+
+    # whiten individual covariance matrices
+    S1 = np.dot(np.dot(W, S1), W.T)
+    S2 = np.dot(np.dot(W, S2), W.T)
 
     # solve generalised eigenvalue problem to get spatial filters
     d, V = la.eigh(S1, S1+S2)
 
-    # idx = np.argsort(d)[::-1]
-    # V = V[:,idx]                            # eigenvectors == spatial filters
-    # print(f'Eigenvectors shape: {V.shape}')
+    idx = np.argsort(d)[::-1]
+    W_csp = V[:,idx]                            # eigenvectors == spatial filters == projection matrix
 
-
-    # select k most important eigenvectors
-    V_csp = V
-    print(f'Spatial filter shape: {V_csp.shape}')
+    print(f'Spatial filter shape: {W_csp.shape}')
 
     # project data onto spatial filters
-    X1_csp = np.dot(W1, V_csp.T)
-    X2_csp = np.dot(W2, V_csp.T)
+    X1_csp = np.stack([np.dot(W_csp, trial) for trial in X1])
+    X2_csp = np.stack([np.dot(W_csp, trial) for trial in X2])
 
-    X1_csp = X1_csp.reshape(25, 4, 768)
-    X2_csp = X2_csp.reshape(25, 4, 768)
+    print(f'X1_csp shape: {X1_csp.shape}')
 
     # V_csp = np.concatenate((V[:, :k], V[:, -k:]), axis=1).T
-
 
     return X1_csp, X2_csp
 
 
-def scatter_plots(dict):
+def scatter_plots(X1, X2, X1_csp, X2_csp):
 
     # channels: CP3, C3, C4, CP4
 
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 5))
 
     # plot 1
-    # takes data (25, 4, 768) - plot first 2 channels for all 25 trials
-    for i in dict['X1']:
-        ax1.scatter(i[1], i[2], color='red', label='class 1')
-    for j in dict['X2']:
-        ax1.scatter(j[1], j[2], color='blue', label='class 2')
+    for i in X1:
+        ax1.scatter(i[1],i[2], color='red', label='class 1')
+    for j in X2:
+        ax1.scatter(j[1],j[2], color='blue', label='class 2')
 
-    for i in dict['X1 CSP']:
-        ax2.scatter(i[1], i[2], color='red', label='class 1')
-    for j in dict['X2 CSP']:
-        ax2.scatter(j[1], j[2], color='blue', label='class 2')
+    for i in X1_csp:
+        ax2.scatter(i[1],i[2], color='red', label='class 1')
+    for j in X2_csp:
+        ax2.scatter(j[1],j[2], color='blue', label='class 2')
+
+
+
+    # for i in dict['X1']:
+    #     ax1.plot(i[1], color='red', label='class 1')
+    # for j in dict['X2']:
+    #     ax2.plot(j[1], color='blue', label='class 2')
+    #
+    # for i in dict['W1']:
+    #     ax3.plot(i[1], color='red', label='class 1')
+    # for j in dict['W2']:
+    #     ax4.plot(i[1], color='blue', label='class 2')
 
     # plot 2
     # takes data (25, 6)
@@ -224,39 +222,29 @@ def main():
     print(f'Number of class 1 trials: {X1.shape[0]}')
     print(f'Number of class 2 trials: {X2.shape[0]}')
 
-    # get whitening matrix
-    W = whitening_matrix(X1=X1, X2=X2)
-    print(f'Whitening matrix shape: {W.shape}')
-
-    # whiten data
-    W1, W2 = whiten(X1=X1, X2=X2, W=W)
-
     # pass data through spatial filters
-    X1_csp, X2_csp = csp(X1=X1, X2=X2, W1=W1, W2=W2, W=W, k=k)
-
-    print(f'Whitened data shape: {W1.shape}')
-    print(f'Filtered data shape: {X1_csp.shape}')
+    X1_csp, X2_csp = csp(X1=X1, X2=X2, k=k)
 
     # compute power
-    P1, P2 = compute_power(W1, W2)
-    P1_csp, P2_csp = compute_power(X1_csp, X2_csp)
-    print(f'Power shape: {P1.shape}')
+    # P1, P2 = compute_power(W1, W2)
+    # P1_csp, P2_csp = compute_power(X1_csp, X2_csp)
+    # print(f'Power shape: {P1.shape}')
 
 
-    data_dict = {
-        'X1': X1,                   # raw data
-        'X2': X2,
-        'W1': W1,                   # whitened data
-        'W2': W2,
-        'X1 CSP': X1_csp,           # post-CSP data
-        'X2 CSP': X2_csp,
-        'P1': P1,                   # whitened power data
-        'P2': P2,
-        'P1 CSP': P1_csp,           # post-CSP power data
-        'P2 CSP': P2_csp
-    }
+    # data_dict = {
+    #     'X1': X1,                   # raw data
+    #     'X2': X2,
+    #     'W1': W1,                   # whitened data
+    #     'W2': W2,
+    #     'X1 CSP': X1_csp,           # post-CSP data
+    #     'X2 CSP': X2_csp,
+    #     'P1': P1,                   # whitened power data
+    #     'P2': P2,
+    #     'P1 CSP': P1_csp,           # post-CSP power data
+    #     'P2 CSP': P2_csp
+    # }
 
-    scatter_plots(data_dict)
+    scatter_plots(X1, X2, X1_csp, X2_csp)
 
 
 
