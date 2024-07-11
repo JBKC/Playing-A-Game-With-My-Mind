@@ -177,7 +177,7 @@ def main():
         if trial == '.DS_Store':
             continue
         # class 1 = relaxed state, class 2 = motor imagery
-        if 'raise right arm' in trial:
+        if 'relax' in trial:
             # print(os.path.splitext(trial)[0])
             with open(os.path.join(folder, trial), 'r') as f:
                 data = json.load(f)
@@ -199,7 +199,7 @@ def main():
                     # Append the new trial along axis=0
                     X1 = np.append(X1, trial_data.reshape(1, *trial_data.shape), axis=0)
 
-        if 'raise left arm' in trial:
+        if 'right hand' in trial:
             # print(os.path.splitext(trial)[0])
             with open(os.path.join(folder, trial), 'r') as f:
                 data = json.load(f)
