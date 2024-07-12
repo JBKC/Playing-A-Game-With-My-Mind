@@ -67,8 +67,8 @@ def plot_psd(freqs, P1, P2, channel_names=['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6'
     ax1.legend()
 
     # Plot for C4 (index 6)
-    ax2.plot(freqs, P1[:, 2, :].mean(axis=0), color='red', linewidth=1, label='right arm')
-    ax2.plot(freqs, P2[:, 2, :].mean(axis=0), color='blue', linewidth=1, label='left arm')
+    ax2.plot(freqs, P1[:, 6, :].mean(axis=0), color='red', linewidth=1, label='right arm')
+    ax2.plot(freqs, P2[:, 6, :].mean(axis=0), color='blue', linewidth=1, label='left arm')
     ax2.set_title(f'PSD for {channel_names[6]} (controls left side)')
     ax2.set_xlabel('Frequency (Hz)')
     ax2.set_ylabel('Power Spectral Density')
@@ -83,8 +83,8 @@ def scatter_logvar(L1, L2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
 
     fig, (ax1) = plt.subplots(1, 1, figsize=(5, 5))
 
-    ax1.scatter(L1[:, 1], L1[:, 2], color='red', linewidth=1, label='right arm')
-    ax1.scatter(L1[:, 1], L2[:, 2], color='blue', linewidth=1, label='left arm')
+    ax1.scatter(L1[:, 1], L1[:, 6], color='red', linewidth=1, label='right arm')
+    ax1.scatter(L1[:, 1], L2[:, 6], color='blue', linewidth=1, label='left arm')
     ax1.legend()
 
     plt.show()
@@ -100,7 +100,6 @@ def plot_logvar(L1, L2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
 
     y0 = np.mean(L1, axis=0)
     y1 = np.mean(L2, axis=0)
-
 
     plt.bar(x0, y0, width=0.4, color='r')
     plt.bar(x1, y1, width=0.4, color='b')
@@ -223,7 +222,7 @@ def main():
     X2 = np.empty((0, 0, 0))                     # class 2 data
 
     # pull trials from saved files
-    folder = "data_3 seconds"
+    folder = "data_4 seconds"
     print(f'Pulling trials...')
 
     for trial in os.listdir(folder):
