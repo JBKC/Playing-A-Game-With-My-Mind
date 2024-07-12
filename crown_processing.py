@@ -3,13 +3,13 @@ Process json data
 '''
 
 import json
+import scipy.io
 from scipy.signal import butter, filtfilt
 import numpy as np
 import scipy.linalg as la
 import os
 from sklearn.covariance import MinCovDet
 from sklearn.decomposition import PCA
-
 import pandas as pd
 import matplotlib.pyplot as plt
 
@@ -26,22 +26,49 @@ def normalise(signal):
     # crop to get rid of edge effects (to update with more elegant method)
     return signal[100:-100]
 
-def compute_power(X1,X2):
+def compute_psd(signal):
+    '''
+    :param takes in 3D array of shape (n_trials, n_channels, n_samples)
+    :return:
+    power spectral density of each shape (n_trials, n_channels, ceil(n_samples+1/2))
+    freqs of shape ceil(n_samples+1/2))
     '''
 
-    :param tensor: takes in data shape (25,4,768)
-    :return: power of each signal, with dimension (25,4)
-    '''
+    freqs, PSD = scipy.signal.welch(signal, fs=265, axis=2, nperseg=signal.shape[2])
 
-    P1 = np.log(np.mean(np.abs(X1) ** 2, axis=2) + 1e-10)
-    P2 = np.log(np.mean(np.abs(X2) ** 2, axis=2) + 1e-10)
-    #
-    # total_mean = np.mean(np.concatenate((P1, P2), axis=0))
-    #
-    # P1 = P1 - total_mean
-    # P2 = P2 - total_mean
+    return np.array(freqs), np.array(PSD)
 
-    return P1, P2
+
+def plot_psd(freqs, P1, P2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
+
+    # (code will be tidied up)
+
+    # Create subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 5))
+
+    # Plot for C3 (index 1)
+    ax1.plot(freqs, P1[:, 1, :].mean(axis=0), color='red', linewidth=1, label='right arm')
+    ax1.plot(freqs, P2[:, 1, :].mean(axis=0), color='blue', linewidth=1, label='left arm')
+    ax1.set_title(f'PSD for {channel_names[1]} (controls right side)')
+    ax1.set_xlabel('Frequency (Hz)')
+    ax1.set_ylabel('Power Spectral Density')
+    ax1.set_xlim(0, 30)
+    ax1.set_ylim(1, 200)
+    ax1.legend()
+
+    # Plot for C4 (index 2)
+    ax2.plot(freqs, P1[:, 2, :].mean(axis=0), color='red', linewidth=1, label='right arm')
+    ax2.plot(freqs, P2[:, 2, :].mean(axis=0), color='blue', linewidth=1, label='left arm')
+    ax2.set_title(f'PSD for {channel_names[2]} (controls left side)')
+    ax2.set_xlabel('Frequency (Hz)')
+    ax2.set_ylabel('Power Spectral Density')
+    ax2.set_xlim(0, 30)
+    ax2.set_ylim(1, 200)
+    ax2.legend()
+
+    plt.tight_layout()
+    plt.show()
+
 
 def whitening_matrix(SX):
 
@@ -53,17 +80,11 @@ def whitening_matrix(SX):
 
     return W
 
-
 def csp(X1, X2, k):
     """
     Compute CSP for two classes of EEG data.
 
-    X1, X2: Whitened EEG data for class 1 and class 2
-            Shape: (n_trials, n_channels, n_samples)
-            trials = number of individual recordings
-            channels = 4 (C3,C4,PC3,PC4)
-            samples = 768 datapoints
-    W: whitening matrix
+    X1, X2: Shape = (n_trials, n_channels, n_samples)
     k: number of top and bottom eigenvectors
     """
 
@@ -116,7 +137,6 @@ def csp(X1, X2, k):
 
     return X1_csp, X2_csp
 
-
 def scatter_plots(X1, X2, X1_csp, X2_csp):
 
     # channels: CP3, C3, C4, CP4
@@ -125,40 +145,14 @@ def scatter_plots(X1, X2, X1_csp, X2_csp):
 
     # plot 1
     for i in X1:
-        ax1.scatter(i[1],i[2], color='red', label='class 1')
+        ax1.scatter(i[1],i[2], color='blue', label='class 1')
     for j in X2:
-        ax1.scatter(j[1],j[2], color='blue', label='class 2')
+        ax1.scatter(j[1],j[2], color='red', label='class 2')
 
     for i in X1_csp:
-        ax2.scatter(i[1],i[2], color='red', label='class 1')
+        ax2.scatter(i[1],i[2], color='blue', label='class 1')
     for j in X2_csp:
-        ax2.scatter(j[1],j[2], color='blue', label='class 2')
-
-
-
-    # for i in dict['X1']:
-    #     ax1.plot(i[1], color='red', label='class 1')
-    # for j in dict['X2']:
-    #     ax2.plot(j[1], color='blue', label='class 2')
-    #
-    # for i in dict['W1']:
-    #     ax3.plot(i[1], color='red', label='class 1')
-    # for j in dict['W2']:
-    #     ax4.plot(i[1], color='blue', label='class 2')
-
-    # plot 2
-    # takes data (25, 6)
-    # fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(1, 5, figsize=(20, 5))
-    # ax1.scatter(dict['X1 CSP'][:, 3], dict['X1 CSP'][:, 1], color='red')      # plot CSP dimension 1 vs. 2
-    # ax1.scatter(dict['X2 CSP'][:, 3], dict['X2 CSP'][:, 1], color='blue')
-    # ax2.scatter(dict['X1 CSP'][:, 3], dict['X1 CSP'][:, 2], color='red')
-    # ax2.scatter(dict['X2 CSP'][:, 3], dict['X2 CSP'][:, 2], color='blue')
-    # ax3.scatter(dict['X1 CSP'][:, 3], dict['X1 CSP'][:, 0], color='red')
-    # ax3.scatter(dict['X2 CSP'][:, 3], dict['X2 CSP'][:, 0], color='blue')
-    # ax4.scatter(dict['X1 CSP'][:, 3], dict['X1 CSP'][:, 4], color='red')
-    # ax4.scatter(dict['X2 CSP'][:, 3], dict['X2 CSP'][:, 4], color='blue')
-    # ax5.scatter(dict['X1 CSP'][:, 3], dict['X1 CSP'][:, 5], color='red')
-    # ax5.scatter(dict['X2 CSP'][:, 3], dict['X2 CSP'][:, 5], color='blue')
+        ax2.scatter(j[1],j[2], color='red', label='class 2')
 
 
     plt.show()
@@ -176,8 +170,8 @@ def main():
     for trial in os.listdir(folder):
         if trial == '.DS_Store':
             continue
-        # class 1 = relaxed state, class 2 = motor imagery
-        if 'relax' in trial:
+        # class 1 = RIGHT ARM, class 2 = LEFT ARM
+        if 'right' in trial:
             # print(os.path.splitext(trial)[0])
             with open(os.path.join(folder, trial), 'r') as f:
                 data = json.load(f)
@@ -186,8 +180,9 @@ def main():
                 trial_data = []
                 for key, value in data.items():
                     # extract channel data
-                    filtered = normalise(bpass_filter(value, lowcut=7, highcut=30.0, fs=256, order=5))
-                    trial_data.append(filtered)
+                    signal = normalise(bpass_filter(value, lowcut=5, highcut=15, fs=256, order=5))
+                    # signal = normalise(value)
+                    trial_data.append(signal)
 
                 # 2D array of size (no. of channels, length of signal)
                 trial_data = np.array(trial_data)
@@ -199,7 +194,7 @@ def main():
                     # Append the new trial along axis=0
                     X1 = np.append(X1, trial_data.reshape(1, *trial_data.shape), axis=0)
 
-        if 'right hand' in trial:
+        if 'left' in trial:
             # print(os.path.splitext(trial)[0])
             with open(os.path.join(folder, trial), 'r') as f:
                 data = json.load(f)
@@ -208,8 +203,9 @@ def main():
                 trial_data = []
                 for key, value in data.items():
                     # extract channel data
-                    filtered = normalise(bpass_filter(value, lowcut=7, highcut=30.0, fs=256, order=5))
-                    trial_data.append(filtered)
+                    signal = normalise(bpass_filter(value, lowcut=5, highcut=15, fs=256, order=5))
+                    # signal = normalise(value)
+                    trial_data.append(signal)
 
                 trial_data = np.array(trial_data)
 
@@ -222,31 +218,19 @@ def main():
     print(f'Number of class 1 trials: {X1.shape[0]}')
     print(f'Number of class 2 trials: {X2.shape[0]}')
 
+    freqs, P1 = compute_psd(X1)
+    _, P2 = compute_psd(X2)
+
+    plot_psd(freqs, P1, P2)
+
+
+
+
+
     # pass data through spatial filters
-    X1_csp, X2_csp = csp(X1=X1, X2=X2, k=k)
+    # X1_csp, X2_csp = csp(X1=X1, X2=X2, k=k)
 
-    # compute power
-    # P1, P2 = compute_power(W1, W2)
-    # P1_csp, P2_csp = compute_power(X1_csp, X2_csp)
-    # print(f'Power shape: {P1.shape}')
-
-
-    # data_dict = {
-    #     'X1': X1,                   # raw data
-    #     'X2': X2,
-    #     'W1': W1,                   # whitened data
-    #     'W2': W2,
-    #     'X1 CSP': X1_csp,           # post-CSP data
-    #     'X2 CSP': X2_csp,
-    #     'P1': P1,                   # whitened power data
-    #     'P2': P2,
-    #     'P1 CSP': P1_csp,           # post-CSP power data
-    #     'P2 CSP': P2_csp
-    # }
-
-    scatter_plots(X1, X2, X1_csp, X2_csp)
-
-
+    # scatter_plots(X1, X2, X1_csp, X2_csp)
 
     # compute power
     return
