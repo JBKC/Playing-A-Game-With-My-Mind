@@ -12,7 +12,6 @@ import pygame
 import random
 import threading
 
-
 # Load environment variables
 load_dotenv()
 
@@ -73,9 +72,9 @@ def main():
         "label": [-1, 1],
         "relax": "Relax"
     }
-    n_iters = 4
-    interval = 4  # length of each prompt (s)
-    eeg_iters = (n_iters * interval) * 16  # set stopping point for EEG
+    n_iters = 4                                         # total number of prompts that will appear
+    interval = 4                                        # length of each prompt (seconds)
+    eeg_iters = (n_iters * interval) * 16               # set stopping point for EEG
     next_time = time.time() + interval
     action_flag = True
     current_task = ""
@@ -91,42 +90,61 @@ def main():
             complete = True
             unsubscribe()
 
+    # begin data callback
+    unsubscribe = neurosity.brainwaves_raw_unfiltered(callback)
+    # record start time of prompt window
+    timestamps.append((time.time(), "startTime"))
+
     # display prompt window
     def display_text(text, color=(0, 0, 0)):
         text_surface = font.render(text, True, color)
         text_rect = text_surface.get_rect(center=(width / 2, height / 2))
         screen.blit(text_surface, text_rect)
 
-    # begin data callback
-    unsubscribe = neurosity.brainwaves_raw_unfiltered(callback)
+    def class_split():
+        # create an even class split that comes up in a random order from user's POV
+        # 1/4 right, 1/4 left, 1/2 relax
 
-    def next_prompt(action_flag):
-        return random.choice(tasks["action"]) if action_flag else tasks["relax"]
+        class1 = [tasks["action"][0]] * (n_iters // 4)              # right arm
+        class2 = [tasks["action"][1]] * (n_iters // 4)              # left arm
 
-    timestamps.append((time.time(), "startTime"))
+        # shuffle order
+        order = []
+        actions = class1 + class2
+        random.shuffle(actions)
+
+        for task in actions:
+            order.extend([task, tasks["relax"]])                # alternate between action and relax
+
+        return order
+
 
     # bring prompt window to front
     pygame.display.set_mode((width, height))
     pygame.display.flip()
 
-    start_time = time.time()
+    # get randomised prompt order
+    prompt_order = class_split()
+    prompt_counter = 0
 
     # iterate through prompts
-    while time.time() - start_time < n_iters * interval:
+    while prompt_counter < len(prompt_order):
         screen.fill((255, 255, 255))
         current_time = time.time()
 
         if current_time >= next_time:
-            current_task = next_prompt(action_flag)
+            current_task = prompt_order[prompt_counter]
 
+            # assign labels
             if current_task != "Relax":
                 label = tasks["label"][tasks["action"].index(current_task)]
             else:
-                label = None
+                label = 0
 
-            timestamps.append((current_time, label))
+            # record data
+            timestamps.append((current_time, current_task, label))
             next_time = current_time + interval
-            action_flag = not action_flag
+            prompt_counter += 1
 
         if current_task:
             display_text(current_task)
@@ -142,12 +160,11 @@ def main():
 
         clock.tick(60)  # limit to 60 FPS
 
+    # finishing screen
     screen.fill((255, 255, 255))
     display_text("FINISHED. Keep headset on", color=(0, 0, 0))
     pygame.display.flip()
-
     pygame.quit()
-
     print(f"Prompts finished; waiting for EEG to finish collecting data")
 
     # wait for EEG to finish
