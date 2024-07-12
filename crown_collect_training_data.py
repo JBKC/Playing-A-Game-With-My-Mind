@@ -142,6 +142,10 @@ def main():
 
         clock.tick(60)  # limit to 60 FPS
 
+    screen.fill((255, 255, 255))
+    display_text("FINISHED. Keep headset on", color=(0, 0, 0))
+    pygame.display.flip()
+
     pygame.quit()
 
     print(f"Prompts finished; waiting for EEG to finish collecting data")
