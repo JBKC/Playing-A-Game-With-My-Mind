@@ -74,6 +74,7 @@ def main():
 
     time.sleep(1)
 
+
     def callback(data):
         global iter, complete
         stream.append(data)
