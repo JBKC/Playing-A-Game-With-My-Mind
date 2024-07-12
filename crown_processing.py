@@ -144,16 +144,9 @@ def csp(X1, X2, k):
     """
 
     # calculate covariance matrices
-    S1 = []
-    S2 = []
+    S1 = np.mean([np.dot(x, x.T) for x in X1], axis=0)
+    S2 = np.mean([np.dot(x, x.T) for x in X2], axis=0)
 
-    for i in X1:
-        S1.append(np.dot(i, i.T))
-    for j in X2:
-        S2.append(np.dot(j, j.T))
-
-    S1 = np.mean(S1, axis=0)
-    S2 = np.mean(S2, axis=0)
     print(f'Cov shape: {S1.shape}')
     # should be 4,4
 
