@@ -52,15 +52,17 @@ data_stream = {}           # dictionary for each data packet
 
 def main():
 
-    trial = input("Trial type - 'relax' or 'right hand': ")
+    trial = input("Trial type - 'right' or 'left': ")
 
     neurosity = initialise()
+    time.sleep(1)
+    print(f'Start Action Now')
 
     def callback(data):
 
         global iter, data_stream, output
 
-        trial_time = 3              # in seconds
+        trial_time = 4              # in seconds
         folder = f'data_{trial_time} seconds'
         os.makedirs(folder, exist_ok=True)
 
@@ -74,7 +76,6 @@ def main():
 
         # add data into output dataframe
         data_stream = pd.DataFrame(data_stream)
-        data_stream = data_stream.drop(['F5', 'PO3', 'PO4', 'F6'], axis=1)
         output = pd.concat([output, data_stream], ignore_index=True)
 
         iter += 1

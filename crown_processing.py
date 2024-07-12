@@ -1,5 +1,6 @@
 '''
 Process json data
+8 channels in order: CP3, C3, F5, PO3, PO4, F6, C4, CP4
 '''
 
 import json
@@ -24,6 +25,7 @@ def normalise(signal):
     # zero mean the signal
     signal = signal - np.mean(signal)
     # crop to get rid of edge effects (to update with more elegant method)
+    # 100 samples = 490ms
     return signal[100:-100]
 
 def compute_psd(tensor):
@@ -47,7 +49,7 @@ def logvar(PSD):
 
     return np.log(np.var(PSD, axis=2))
 
-def plot_psd(freqs, P1, P2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
+def plot_psd(freqs, P1, P2, channel_names=['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6', 'C4', 'CP4']):
 
     # (code will be tidied up)
 
@@ -64,10 +66,10 @@ def plot_psd(freqs, P1, P2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
     ax1.set_ylim(1, 50)
     ax1.legend()
 
-    # Plot for C4 (index 2)
+    # Plot for C4 (index 6)
     ax2.plot(freqs, P1[:, 2, :].mean(axis=0), color='red', linewidth=1, label='right arm')
     ax2.plot(freqs, P2[:, 2, :].mean(axis=0), color='blue', linewidth=1, label='left arm')
-    ax2.set_title(f'PSD for {channel_names[2]} (controls left side)')
+    ax2.set_title(f'PSD for {channel_names[6]} (controls left side)')
     ax2.set_xlabel('Frequency (Hz)')
     ax2.set_ylabel('Power Spectral Density')
     ax2.set_xlim(0, 30)
@@ -81,7 +83,6 @@ def scatter_logvar(L1, L2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
 
     fig, (ax1) = plt.subplots(1, 1, figsize=(5, 5))
 
-    # Plot for C3 vs C4
     ax1.scatter(L1[:, 1], L1[:, 2], color='red', linewidth=1, label='right arm')
     ax1.scatter(L1[:, 1], L2[:, 2], color='blue', linewidth=1, label='left arm')
     ax1.legend()
@@ -90,15 +91,18 @@ def scatter_logvar(L1, L2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
 
 def plot_logvar(L1, L2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
 
+    print(L1.shape)
+
     plt.figure(figsize=(8,5))
 
     x0 = np.arange(L1.shape[1])
     x1 = np.arange(L1.shape[1]) + 0.4
 
-    y0 = np.mean(L1[2])
-    y1 = np.mean(L2[2])
+    y0 = np.mean(L1, axis=0)
+    y1 = np.mean(L2, axis=0)
 
-    plt.bar(x0, y0, width=0.5, color='r')
+
+    plt.bar(x0, y0, width=0.4, color='r')
     plt.bar(x1, y1, width=0.4, color='b')
 
     plt.xlim(-0.5, L1.shape[1] + 0.5)
@@ -133,7 +137,7 @@ def whitening_matrix(sigma):
     # W = np.dot(U, np.dot(np.diag(1.0 / np.sqrt(D + 1e-5)), U.T))               # ZCA
     # W = np.dot(np.diag(1.0 / np.sqrt(D + 1e-5)), U.T)                          # PCA
 
-    return np.dot(U, np.diag(D ** -0.5))
+    return np.dot(np.diag(D ** -0.5), U.T)
 
 def csp(X1, X2, k):
     """
@@ -144,38 +148,41 @@ def csp(X1, X2, k):
     """
 
     # calculate covariance matrices
-    S1 = np.mean([np.dot(x, x.T) for x in X1], axis=0)
-    S2 = np.mean([np.dot(x, x.T) for x in X2], axis=0)
+    R1 = np.mean([np.dot(x, x.T) for x in X1], axis=0)
+    R2 = np.mean([np.dot(x, x.T) for x in X2], axis=0)
 
-    print(f'Cov shape: {S1.shape}')
-    # should be 4,4
+    print(f'Cov shape: {R1.shape}')
+    # should be (n_channels, n_channels)
 
-    # get composite covariance matrix
-    SX = S1 + S2
-
-    # get whitening matrix
-    W = whitening_matrix(SX)
-    print(f'Whitening matrix shape: {W.shape}')
+    # get whitening matrix P from composite covariance matrix
+    P = whitening_matrix(R1 + R2)
+    print(f'Whitening matrix shape: {P.shape}')
 
     # whiten individual covariance matrices
-    S1 = np.dot(np.dot(W, S1), W.T)
-    S2 = np.dot(np.dot(W, S2), W.T)
+    S1 = np.dot(np.dot(P, R1), P.T)
+    S2 = np.dot(np.dot(P, R2), P.T)
+
+    # print(S1)
+    # print(S1+S2)
+    # should == identity matrix
+
+    D1, V1, _ = np.linalg.svd(S1)
+    D2, V2, _ = np.linalg.svd(S2)
 
     # solve generalised eigenvalue problem to get spatial filters
-    d, V = la.eigh(S1, S1+S2)
+    d, W = la.eigh(S1, S1+S2)
+    # eigenvectors == spatial filters == projection matrix
+    print(f'Discriminative eigenvalues {d}')
+    print(W)
+    print(f'Spatial filter shape: {W.shape}')
 
-    idx = np.argsort(d)[::-1]
-    W_csp = V[:,idx]                            # eigenvectors == spatial filters == projection matrix
-
-    print(f'Spatial filter shape: {W_csp.shape}')
+    # W = np.column_stack((W[:, 0], W[:, -1]))
 
     # project data onto spatial filters
-    X1_csp = np.stack([np.dot(W_csp, trial) for trial in X1])
-    X2_csp = np.stack([np.dot(W_csp, trial) for trial in X2])
+    X1_csp = np.stack([np.dot(W.T, trial) for trial in X1])
+    X2_csp = np.stack([np.dot(W.T, trial) for trial in X2])
 
     print(f'X1_csp shape: {X1_csp.shape}')
-
-    # V_csp = np.concatenate((V[:, :k], V[:, -k:]), axis=1).T
 
     return X1_csp, X2_csp
 
@@ -211,7 +218,7 @@ def scatter_plots(X1, X2, X1_csp, X2_csp):
 
 def main():
 
-    k = 3
+    k = 1
     X1 = np.empty((0, 0, 0))                     # class 1 data
     X2 = np.empty((0, 0, 0))                     # class 2 data
 
@@ -269,19 +276,20 @@ def main():
 
     print(f'Number of class 1 trials: {X1.shape[0]}')
     print(f'Number of class 2 trials: {X2.shape[0]}')
+    print(f'Input data shape: {X1.shape}')
 
     # pass data through spatial filters
-    X1,X2 = csp(X1=X1, X2=X2, k=k)
+    X1, X2 = csp(X1=X1, X2=X2, k=k)
 
     # get Power Spectral Densities
     freqs, P1 = compute_psd(X1)
     _, P2 = compute_psd(X2)
-    # plot_psd(freqs, P1, P2)
+    plot_psd(freqs, P1, P2)
 
     # get Log Variance
     L1 = logvar(P1)
     L2 = logvar(P2)
-    # scatter_logvar(L1,L2)
+    scatter_logvar(L1,L2)
     plot_logvar(L1, L2)
 
     return
