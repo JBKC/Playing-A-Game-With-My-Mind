@@ -49,27 +49,24 @@ def logvar(PSD):
 
     return np.log(np.var(PSD, axis=2))
 
-def plot_psd(freqs, P1, P2, channel_names=['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6', 'C4', 'CP4']):
-
-    # (code will be tidied up)
+def plot_psd(freqs, P1, P2):
 
     # Create subplots
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 5))
 
-    # Plot for C3 (index 1)
-    ax1.plot(freqs, P1[:, 1, :].mean(axis=0), color='red', linewidth=1, label='right arm')
-    ax1.plot(freqs, P2[:, 1, :].mean(axis=0), color='blue', linewidth=1, label='left arm')
-    ax1.set_title(f'PSD for {channel_names[1]} (controls right side)')
+    # plot the first and last eigenvectors (the most extreme discrimination)
+    ax1.plot(freqs, P1[:, 0, :].mean(axis=0), color='red', linewidth=1, label='right')
+    ax1.plot(freqs, P2[:, 0, :].mean(axis=0), color='blue', linewidth=1, label='left')
+    # ax1.set_title(f'PSD for {channel_names[1]} (controls right side)')
     ax1.set_xlabel('Frequency (Hz)')
     ax1.set_ylabel('Power Spectral Density')
     ax1.set_xlim(0, 30)
     ax1.set_ylim(1, 50)
     ax1.legend()
 
-    # Plot for C4 (index 6)
-    ax2.plot(freqs, P1[:, 6, :].mean(axis=0), color='red', linewidth=1, label='right arm')
-    ax2.plot(freqs, P2[:, 6, :].mean(axis=0), color='blue', linewidth=1, label='left arm')
-    ax2.set_title(f'PSD for {channel_names[6]} (controls left side)')
+    ax2.plot(freqs, P1[:, -1, :].mean(axis=0), color='red', linewidth=1, label='right')
+    ax2.plot(freqs, P2[:, -1, :].mean(axis=0), color='blue', linewidth=1, label='left')
+    # ax2.set_title(f'PSD for {channel_names[6]} (controls left side)')
     ax2.set_xlabel('Frequency (Hz)')
     ax2.set_ylabel('Power Spectral Density')
     ax2.set_xlim(0, 30)
@@ -79,19 +76,21 @@ def plot_psd(freqs, P1, P2, channel_names=['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6'
     plt.tight_layout()
     plt.show()
 
-def scatter_logvar(L1, L2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
+def scatter_logvar(L1, L2):
+
+    # plot logvar data of most discriminative eigenvectors
 
     fig, (ax1) = plt.subplots(1, 1, figsize=(5, 5))
 
-    ax1.scatter(L1[:, 1], L1[:, 6], color='red', linewidth=1, label='right arm')
-    ax1.scatter(L1[:, 1], L2[:, 6], color='blue', linewidth=1, label='left arm')
+    ax1.scatter(L1[:, 0], L1[:, -1], color='red', linewidth=1, label='right')
+    ax1.scatter(L1[:, 0], L2[:, -1], color='blue', linewidth=1, label='left')
     ax1.legend()
 
     plt.show()
 
-def plot_logvar(L1, L2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
+def plot_logvar(L1, L2):
 
-    print(L1.shape)
+    # bar chart plot of post-CSP log variance
 
     plt.figure(figsize=(8,5))
 
@@ -116,17 +115,6 @@ def plot_logvar(L1, L2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
     return
 
 
-
-def cov(tensor):
-    '''
-    Calculate covariance matrix for 3D tensor of shape (n_trials, n_channels, n_samples)
-    :param tensor:
-    :return:
-    '''
-    covs = [np.dot(tensor[i,:,:],tensor[i,:,:].T) / tensor.shape[2] for i in range(tensor.shape[0])]
-    covs = np.array(covs)
-
-    return np.mean(covs, axis=0)
 
 def whitening_matrix(sigma):
 
@@ -170,6 +158,8 @@ def csp(X1, X2, k):
 
     # solve generalised eigenvalue problem to get spatial filters
     d, W = la.eigh(S1, S1+S2)
+    idx = np.argsort(d)[::-1]
+    W = W[:,idx]
     # eigenvectors == spatial filters == projection matrix
     print(f'Discriminative eigenvalues {d}')
     print(W)
@@ -185,35 +175,6 @@ def csp(X1, X2, k):
 
     return X1_csp, X2_csp
 
-def apply_filters(X,W):
-
-    X_csp = np.zeros((X.shape[0],X.shape[1],X.shape[2]))
-
-    for i in range(X.shape[0]):
-        X_csp[i,:,:] = np.dot(W.T, X[i,:,:])
-
-    return X_csp
-
-
-def scatter_plots(X1, X2, X1_csp, X2_csp):
-
-    # channels: CP3, C3, C4, CP4
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 5))
-
-    # plot 1
-    for i in X1:
-        ax1.scatter(i[1],i[2], color='blue', label='class 1')
-    for j in X2:
-        ax1.scatter(j[1],j[2], color='red', label='class 2')
-
-    for i in X1_csp:
-        ax2.scatter(i[1],i[2], color='blue', label='class 1')
-    for j in X2_csp:
-        ax2.scatter(j[1],j[2], color='red', label='class 2')
-
-
-    plt.show()
 
 def main():
 
@@ -228,7 +189,7 @@ def main():
     for trial in os.listdir(folder):
         if trial == '.DS_Store':
             continue
-        # class 1 = RIGHT ARM, class 2 = LEFT ARM
+        # class 1 = right, class 2 = left
         if 'right' in trial:
             # print(os.path.splitext(trial)[0])
             with open(os.path.join(folder, trial), 'r') as f:
@@ -289,7 +250,6 @@ def main():
     L1 = logvar(P1)
     L2 = logvar(P2)
     scatter_logvar(L1,L2)
-    plot_logvar(L1, L2)
 
     return
 
