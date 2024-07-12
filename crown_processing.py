@@ -26,18 +26,26 @@ def normalise(signal):
     # crop to get rid of edge effects (to update with more elegant method)
     return signal[100:-100]
 
-def compute_psd(signal):
+def compute_psd(tensor):
     '''
-    :param takes in 3D array of shape (n_trials, n_channels, n_samples)
+    :param takes in 3D tensor of shape (n_trials, n_channels, n_samples)
     :return:
     power spectral density of each shape (n_trials, n_channels, ceil(n_samples+1/2))
     freqs of shape ceil(n_samples+1/2))
     '''
 
-    freqs, PSD = scipy.signal.welch(signal, fs=265, axis=2, nperseg=signal.shape[2])
+    freqs, PSD = scipy.signal.welch(tensor, fs=265, axis=2, nperseg=tensor.shape[2])
 
     return np.array(freqs), np.array(PSD)
 
+def logvar(PSD):
+    '''
+    Inputs PSD, returns a single power value for the plot as the log variance of the PSD
+    :param PSD: shape (n_trials, n_channels, n_psd_points)
+    :return: log variance of shape (n_trials, n_channels)
+    '''
+
+    return np.log(np.var(PSD, axis=2))
 
 def plot_psd(freqs, P1, P2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
 
@@ -53,7 +61,7 @@ def plot_psd(freqs, P1, P2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
     ax1.set_xlabel('Frequency (Hz)')
     ax1.set_ylabel('Power Spectral Density')
     ax1.set_xlim(0, 30)
-    ax1.set_ylim(1, 200)
+    ax1.set_ylim(1, 50)
     ax1.legend()
 
     # Plot for C4 (index 2)
@@ -63,22 +71,69 @@ def plot_psd(freqs, P1, P2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
     ax2.set_xlabel('Frequency (Hz)')
     ax2.set_ylabel('Power Spectral Density')
     ax2.set_xlim(0, 30)
-    ax2.set_ylim(1, 200)
+    ax2.set_ylim(1, 50)
     ax2.legend()
 
     plt.tight_layout()
     plt.show()
 
+def scatter_logvar(L1, L2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
 
-def whitening_matrix(SX):
+    fig, (ax1) = plt.subplots(1, 1, figsize=(5, 5))
+
+    # Plot for C3 vs C4
+    ax1.scatter(L1[:, 1], L1[:, 2], color='red', linewidth=1, label='right arm')
+    ax1.scatter(L1[:, 1], L2[:, 2], color='blue', linewidth=1, label='left arm')
+    ax1.legend()
+
+    plt.show()
+
+def plot_logvar(L1, L2, channel_names=['CP3', 'C3', 'C4', 'CP4']):
+
+    plt.figure(figsize=(8,5))
+
+    x0 = np.arange(L1.shape[1])
+    x1 = np.arange(L1.shape[1]) + 0.4
+
+    y0 = np.mean(L1[2])
+    y1 = np.mean(L2[2])
+
+    plt.bar(x0, y0, width=0.5, color='r')
+    plt.bar(x1, y1, width=0.4, color='b')
+
+    plt.xlim(-0.5, L1.shape[1] + 0.5)
+
+    plt.gca().yaxis.grid(True)
+    plt.title('log-var of each channel/component')
+    plt.xlabel('channels/components')
+    plt.ylabel('log-var')
+
+    plt.show()
+
+    return
+
+
+
+def cov(tensor):
+    '''
+    Calculate covariance matrix for 3D tensor of shape (n_trials, n_channels, n_samples)
+    :param tensor:
+    :return:
+    '''
+    covs = [np.dot(tensor[i,:,:],tensor[i,:,:].T) / tensor.shape[2] for i in range(tensor.shape[0])]
+    covs = np.array(covs)
+
+    return np.mean(covs, axis=0)
+
+def whitening_matrix(sigma):
 
     # eigendecomposition of composite covariance matrix
-    U, D, _ = np.linalg.svd(SX)
+    U, D, _ = np.linalg.svd(sigma)
 
     # W = np.dot(U, np.dot(np.diag(1.0 / np.sqrt(D + 1e-5)), U.T))               # ZCA
-    W = np.dot(np.diag(1.0 / np.sqrt(D + 1e-5)), U.T)                          # PCA
+    # W = np.dot(np.diag(1.0 / np.sqrt(D + 1e-5)), U.T)                          # PCA
 
-    return W
+    return np.dot(U, np.diag(D ** -0.5))
 
 def csp(X1, X2, k):
     """
@@ -88,20 +143,14 @@ def csp(X1, X2, k):
     k: number of top and bottom eigenvectors
     """
 
-    # rehsape data
-    # W1 = W1.reshape((-1, np.prod(W1.shape[1:])))
-    # W2 = W2.reshape((-1, np.prod(W2.shape[1:])))
-
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20, 5))
-
     # calculate covariance matrices
     S1 = []
     S2 = []
 
-    for trial in X1:
-        S1.append(np.dot(trial, trial.T))
-    for trial in X2:
-        S2.append(np.dot(trial, trial.T))
+    for i in X1:
+        S1.append(np.dot(i, i.T))
+    for j in X2:
+        S2.append(np.dot(j, j.T))
 
     S1 = np.mean(S1, axis=0)
     S2 = np.mean(S2, axis=0)
@@ -136,6 +185,16 @@ def csp(X1, X2, k):
     # V_csp = np.concatenate((V[:, :k], V[:, -k:]), axis=1).T
 
     return X1_csp, X2_csp
+
+def apply_filters(X,W):
+
+    X_csp = np.zeros((X.shape[0],X.shape[1],X.shape[2]))
+
+    for i in range(X.shape[0]):
+        X_csp[i,:,:] = np.dot(W.T, X[i,:,:])
+
+    return X_csp
+
 
 def scatter_plots(X1, X2, X1_csp, X2_csp):
 
@@ -218,21 +277,20 @@ def main():
     print(f'Number of class 1 trials: {X1.shape[0]}')
     print(f'Number of class 2 trials: {X2.shape[0]}')
 
+    # pass data through spatial filters
+    X1,X2 = csp(X1=X1, X2=X2, k=k)
+
+    # get Power Spectral Densities
     freqs, P1 = compute_psd(X1)
     _, P2 = compute_psd(X2)
+    # plot_psd(freqs, P1, P2)
 
-    plot_psd(freqs, P1, P2)
+    # get Log Variance
+    L1 = logvar(P1)
+    L2 = logvar(P2)
+    # scatter_logvar(L1,L2)
+    plot_logvar(L1, L2)
 
-
-
-
-
-    # pass data through spatial filters
-    # X1_csp, X2_csp = csp(X1=X1, X2=X2, k=k)
-
-    # scatter_plots(X1, X2, X1_csp, X2_csp)
-
-    # compute power
     return
 
 
