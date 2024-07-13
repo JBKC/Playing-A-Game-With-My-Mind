@@ -165,7 +165,7 @@ def spatial_filter(X1, X2):
     X1_csp = np.stack([np.dot(W.T, trial) for trial in X1])
     X2_csp = np.stack([np.dot(W.T, trial) for trial in X2])
 
-    print(f'X1_csp shape: {X1_csp.shape}')
+    print(f'Data after spatial filtering shape: {X1_csp.shape}')
 
     return X1_csp, X2_csp
 
