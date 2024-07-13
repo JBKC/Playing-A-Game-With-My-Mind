@@ -124,35 +124,32 @@ def whitening_matrix(sigma):
     return np.dot(np.diag(D ** -0.5), U.T)
 
 
-def csp(X1, X2):
+def spatial_filter(X1, X2):
     """
     Compute CSP for two classes of EEG data.
 
     X1, X2: Shape = (n_trials, n_channels, n_samples)
-    k: number of top and bottom eigenvectors
     """
 
     # calculate covariance matrices
     R1 = np.mean([np.dot(x, x.T) for x in X1], axis=0)
     R2 = np.mean([np.dot(x, x.T) for x in X2], axis=0)
 
-    print(f'Cov shape: {R1.shape}')
-    # should be (n_channels, n_channels)
+    print(f'Cov shape: {R1.shape}')                                 # shape (n_channels, n_channels)
 
     # get whitening matrix P from composite covariance matrix
     P = whitening_matrix(R1 + R2)
-    print(f'Whitening matrix shape: {P.shape}')
+    print(f'Whitening matrix shape: {P.shape}')                     # shape (n_channels, n_channels)
 
     # whiten individual covariance matrices
     S1 = np.dot(np.dot(P, R1), P.T)
     S2 = np.dot(np.dot(P, R2), P.T)
 
-    # print(S1)
     # print(S1+S2)
-    # should == identity matrix
+    # == identity matrix
 
-    D1, V1, _ = np.linalg.svd(S1)
-    D2, V2, _ = np.linalg.svd(S2)
+    # D1, V1, _ = np.linalg.svd(S1)
+    # D2, V2, _ = np.linalg.svd(S2)
 
     # solve generalised eigenvalue problem to get spatial filters
     d, W = la.eigh(S1, S1+S2)
@@ -160,7 +157,6 @@ def csp(X1, X2):
     W = W[:,idx]
     # eigenvectors == spatial filters == projection matrix
     print(f'Discriminative eigenvalues {d}')
-    print(W)
     print(f'Spatial filter shape: {W.shape}')
 
     # W = np.column_stack((W[:, 0], W[:, -1]))
@@ -172,25 +168,6 @@ def csp(X1, X2):
     print(f'X1_csp shape: {X1_csp.shape}')
 
     return X1_csp, X2_csp
-
-def assign_trials(df, labels):
-    '''
-    Slice up trials using timestamps from label data
-    '''
-
-    signal_times = np.array(df['time'])
-    data = []
-
-    for trial in labels:
-        idx = np.where((signal_times >= trial[0]) & (signal_times <= trial[1]))[0]
-        # trim to length (hacky temporary solution)
-        idx = idx[:1001]
-        data.append(df.iloc[idx])
-
-    tensor = np.stack([df.values for df in data])
-
-    # output tensor is shape (n_trials, n_channels, n_samples)
-    return np.transpose(tensor, (0, 2, 1))
 
 def main():
 
@@ -237,7 +214,7 @@ def main():
         with open(os.path.join(folder, session), 'r') as f:
             data = json.load(f)
 
-            output = pd.DataFrame()     # for holding entire session's data (all trials)
+            df = pd.DataFrame()         # output dataframe for holding entire session's data (all trials)
             stream = {}                 # individual streams within output dataframe
 
             # pull individual dictionaries (datapackets)
@@ -252,17 +229,42 @@ def main():
 
                 # add stream into output dataframe
                 stream = pd.DataFrame(stream)
-                output = pd.concat([output, stream], ignore_index=True)
+                df = pd.concat([df, stream], ignore_index=True)
 
             # interpolate time values (smooth increments)
-            output = interpolate(output)
+            df = interpolate(df)
 
-            # apply filtering + normalisation to channels
+            # apply filtering + normalisation to channel signals
             for channel in channels:
-                output[channel] = normalise(bpass_filter(output[channel].values, lowcut=5, highcut=15, fs=256, order=5))
+                df[channel] = normalise(bpass_filter(df[channel].values, lowcut=5, highcut=15, fs=256, order=5))
 
-            return output
+            return df
 
+    def assign_trials(df, onsets):
+        '''
+        Slice up and append trials using timestamps from label data
+        :param df: DataFrame of session; onsets: list of class onset timestamps
+        :return: tensor of shape (n_trials, n_channels, n_samples)
+        '''
+
+        window = 1024                               # prompt length (4 seconds) * fs (256 Hz)
+        signal_times = np.array(df['time'])
+        data = []                                   # list of dataframes
+
+        # iterate through onset times
+        for trial in onsets:
+            start_idx = np.where(signal_times >= trial)[0][0]           # get index of start of trial in signal
+            end_idx = min(start_idx + window, len(signal_times))        # end index of trial
+            idx = np.arange(start_idx,end_idx)
+            data.append(df.iloc[idx])
+
+        # create training tensor
+        tensor = np.stack([df.drop(columns=['time']).values for df in data])
+
+        # output tensor is shape (n_trials, n_channels, n_samples)
+        return np.transpose(tensor, (0, 2, 1))
+
+    ##########################################
     # pull saved files
     folder = "test data"
     for session in os.listdir(folder):
@@ -278,27 +280,24 @@ def main():
         if 'labels' in session:
             with open(os.path.join(folder, session), 'r') as f:
                 data = json.load(f)
-                # zip start time, end time, and label
-                labels = [(current[0], next_item[0], current[-1])
-                          for current, next_item in zip(data[:-1], data[1:])]
+                # pair onsets with class label
+                labels = [(i[0], i[-1]) for i in data]
 
-            # print(labels)
-            # get class timestamps (allows to window the original signal data)
-            times_1 = [(i[0],i[1]) for i in labels if i[-1] == -1]      # right data
-            times_2 = [(i[0], i[1]) for i in labels if i[-1] == 1]      # left data
+            # get class onsets
+            onsets_1 = [(i[0]) for i in labels if i[-1] == -1]      # right data
+            onsets_2 = [(i[0]) for i in labels if i[-1] == 1]       # left data
 
-    print(f'Number of class 1 trials: {len(times_1)}')
-    print(f'Number of class 2 trials: {len(times_2)}')
+    print(f'Number of class 1 trials: {len(onsets_1)}')
+    print(f'Number of class 2 trials: {len(onsets_2)}')
 
+    # match up class onsets with signal data in DataFrame
+    X1 = assign_trials(df, onsets_1)
+    X2 = assign_trials(df, onsets_2)
 
-    # match up label timestamps with signal data in DataFrame
-    X1 = assign_trials(df, times_1)
-    X2 = assign_trials(df, times_2)
+    print(f'Input data shape: {X1.shape}')
 
-    print(f'Input data shape: {X2.shape}')
-
-    # pass data through spatial filters
-    X1, X2 = csp(X1=X1, X2=X2)
+    # pass data through spatial filters using CSP
+    X1, X2 = spatial_filter(X1=X1, X2=X2)
 
     # get Power Spectral Densities
     freqs, P1 = compute_psd(X1)
