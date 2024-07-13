@@ -231,6 +231,7 @@ def main():
                 if X2.size == 0:
                     X2 = trial_data.reshape(1, *trial_data.shape)
                 else:
+
                     # Append the new trial along axis=0
                     X2 = np.append(X2, trial_data.reshape(1, *trial_data.shape), axis=0)
 
