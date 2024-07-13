@@ -9,9 +9,10 @@ from scipy.signal import butter, filtfilt
 import numpy as np
 import scipy.linalg as la
 import os
+from sklearn.covariance import MinCovDet
+from sklearn.decomposition import PCA
 import pandas as pd
 import matplotlib.pyplot as plt
-
 
 def bpass_filter(data, lowcut, highcut, fs, order=5):
     nyquist = 0.5 * fs
@@ -113,6 +114,8 @@ def plot_logvar(L1, L2):
 
     return
 
+
+
 def whitening_matrix(sigma):
 
     # eigendecomposition of composite covariance matrix
@@ -123,8 +126,7 @@ def whitening_matrix(sigma):
 
     return np.dot(np.diag(D ** -0.5), U.T)
 
-
-def csp(X1, X2):
+def csp(X1, X2, k):
     """
     Compute CSP for two classes of EEG data.
 
@@ -173,119 +175,71 @@ def csp(X1, X2):
 
     return X1_csp, X2_csp
 
-def assign_trials(signal_times, labels_1, labels_2):
-    '''
-    Assign trials using timestamps from label data
-    '''
-
-    print(len(signal_times))
-
-    for trial in labels_1:
-
-        print(trial)
-
-
 
 def main():
 
-    def interpolate(output):
-        '''
-        Custom function for interpolating Crown time output to get continuous timestamps
-        Required because each datapacket of 16 points all share the same timestamp
-        :param output: DataFrame of session
-        :return: edited DataFrame with interpolated times
-        '''
+    k = 1
+    X1 = np.empty((0, 0, 0))                     # class 1 data
+    X2 = np.empty((0, 0, 0))                     # class 2 data
 
-        times = output['time']
-        # window in segments of 16+1
-        step = 16
-        n_windows = int(len(times) / step)
-        new_times = []
+    # pull trials from saved files
+    folder = "data_4 seconds"
+    print(f'Pulling trials...')
 
-        # interpolate between timestamps of datapackets
-        for i in range(n_windows):
-            start_idx = i * step
-            end_idx = start_idx + step
-            start = times[start_idx]
-
-            if i == n_windows - 1:          # if it's the last window
-                end = start + 1000/16       # 16 packets = 1000ms
-            else:
-                end = times[end_idx]
-
-            correction = end - (end - start) * 1 / step     # correct to end of packet i (rather than beginning of packet i+1)
-            new_times.extend(np.linspace(start, correction, step))
-
-        output['time'] = new_times
-        # output.to_json('output.json', orient='records', lines=True)
-
-        return output
-
-    def get_dataframe():
-        '''
-        Extracts and reformats raw signal data from JSON file
-        Contains list of dictionaries of length n_iterations (1 iteration = 16 datapoints for each of 8 channels)
-        :return: pandas Dataframe of shape (n_samples, n_channels)
-        '''
-
-        with open(os.path.join(folder, session), 'r') as f:
-            data = json.load(f)
-
-            output = pd.DataFrame()     # for holding entire session's data (all trials)
-            stream = {}                 # individual streams within output dataframe
-
-            # pull individual dictionaries (datapackets)
-            for packet in data:
-                channels = packet['info']['channelNames']
-                signals = packet['data']
-                stream['time'] = packet['info']['startTime']
-
-                # reformat channel data
-                for i, channel in enumerate(channels):
-                    stream[channel] = signals[i]
-
-                # add stream into output dataframe
-                stream = pd.DataFrame(stream)
-                output = pd.concat([output, stream], ignore_index=True)
-
-            # interpolate time values (smooth increments)
-            output = interpolate(output)
-
-            return output
-
-    # pull saved files
-    folder = "test data"
-    for session in os.listdir(folder):
-
-        # pull continuous signal data
-        if 'eeg_stream' in session:
-            # extract list of dictionaries (datapackets) into one dataframe
-            df = get_dataframe()
-
-            print(f'All data shape: {df.shape}')
-
-        # pull trial labels
-        if 'labels' in session:
-            with open(os.path.join(folder, session), 'r') as f:
+    for trial in os.listdir(folder):
+        if trial == '.DS_Store':
+            continue
+        # class 1 = right, class 2 = left
+        if 'right' in trial:
+            # print(os.path.splitext(trial)[0])
+            with open(os.path.join(folder, trial), 'r') as f:
                 data = json.load(f)
-                # zip start time, end time, and label
-                labels = [(current[0], next_item[0], current[-1])
-                          for current, next_item in zip(data[:-1], data[1:])]
 
-            # print(labels)
-            # get class timestamps (allows to window the original signal data)
-            times_1 = [(i[0],i[1]) for i in labels if i[-1] == -1]      # right data
-            times_2 = [(i[0], i[1]) for i in labels if i[-1] == 1]      # left data
+                # get individual trial data
+                trial_data = []
+                for key, value in data.items():
+                    # extract channel data
+                    signal = normalise(bpass_filter(value, lowcut=5, highcut=15, fs=256, order=5))
+                    # signal = normalise(value)
+                    trial_data.append(signal)
 
-    print(f'Number of class 1 trials: {len(times_1)}')
-    print(f'Number of class 2 trials: {len(times_2)}')
+                # 2D array of size (no. of channels, length of signal)
+                trial_data = np.array(trial_data)
 
-    # match up label timestamps with signal data in DataFrame
-    assign_trials(np.array(df['time']), times_1, times_2)
+                # If X1 is empty, initialize it with the shape of the first trial
+                if X1.size == 0:
+                    X1 = trial_data.reshape(1, *trial_data.shape)
+                else:
+                    # Append the new trial along axis=0
+                    X1 = np.append(X1, trial_data.reshape(1, *trial_data.shape), axis=0)
 
+        if 'left' in trial:
+            # print(os.path.splitext(trial)[0])
+            with open(os.path.join(folder, trial), 'r') as f:
+                data = json.load(f)
+
+                # get individual trial data
+                trial_data = []
+                for key, value in data.items():
+                    # extract channel data
+                    signal = normalise(bpass_filter(value, lowcut=5, highcut=15, fs=256, order=5))
+                    # signal = normalise(value)
+                    trial_data.append(signal)
+
+                trial_data = np.array(trial_data)
+
+                if X2.size == 0:
+                    X2 = trial_data.reshape(1, *trial_data.shape)
+                else:
+                    # Append the new trial along axis=0
+                    X2 = np.append(X2, trial_data.reshape(1, *trial_data.shape), axis=0)
+
+    print(f'Number of class 1 trials: {X1.shape[0]}')
+    print(f'Number of class 2 trials: {X2.shape[0]}')
+    print(f'Input data shape: {X1.shape}')
 
     # pass data through spatial filters
-    X1, X2 = csp(X1=X1, X2=X2)
+    X1, X2 = csp(X1=X1, X2=X2, k=k)
 
     # get Power Spectral Densities
     freqs, P1 = compute_psd(X1)
@@ -302,7 +256,6 @@ def main():
 
 if __name__ == '__main__':
     main()
-
 
 
 
