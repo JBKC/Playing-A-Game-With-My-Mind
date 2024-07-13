@@ -178,8 +178,6 @@ def assign_trials(signal_times, labels_1, labels_2):
     Assign trials using timestamps from label data
     '''
 
-    print(len(signal_times))
-
     for trial in labels_1:
 
         print(trial)
