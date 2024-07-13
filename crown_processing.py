@@ -23,9 +23,9 @@ def bpass_filter(data, lowcut, highcut, fs, order=5):
 def normalise(signal):
     # zero mean the signal
     signal = signal - np.mean(signal)
-    # crop to get rid of edge effects (to update with more elegant method)
+    # can crop to get rid of edge effects (to update with more elegant method)
     # 100 samples = 490ms
-    return signal[100:-100]
+    return signal
 
 def compute_psd(tensor):
     '''
@@ -173,16 +173,24 @@ def csp(X1, X2):
 
     return X1_csp, X2_csp
 
-def assign_trials(signal_times, labels_1, labels_2):
+def assign_trials(df, labels):
     '''
-    Assign trials using timestamps from label data
+    Slice up trials using timestamps from label data
     '''
 
-    for trial in labels_1:
+    signal_times = np.array(df['time'])
+    data = []
 
-        print(trial)
+    for trial in labels:
+        idx = np.where((signal_times >= trial[0]) & (signal_times <= trial[1]))[0]
+        # trim to length (hacky temporary solution)
+        idx = idx[:1001]
+        data.append(df.iloc[idx])
 
+    tensor = np.stack([df.values for df in data])
 
+    # output tensor is shape (n_trials, n_channels, n_samples)
+    return np.transpose(tensor, (0, 2, 1))
 
 def main():
 
@@ -221,7 +229,7 @@ def main():
 
     def get_dataframe():
         '''
-        Extracts and reformats raw signal data from JSON file
+        Extracts, processes and reformats raw signal data from JSON file
         Contains list of dictionaries of length n_iterations (1 iteration = 16 datapoints for each of 8 channels)
         :return: pandas Dataframe of shape (n_samples, n_channels)
         '''
@@ -236,7 +244,7 @@ def main():
             for packet in data:
                 channels = packet['info']['channelNames']
                 signals = packet['data']
-                stream['time'] = packet['info']['startTime']
+                stream['time'] = packet['info']['startTime'] / 1000      # convert to seconds to match label data
 
                 # reformat channel data
                 for i, channel in enumerate(channels):
@@ -248,6 +256,10 @@ def main():
 
             # interpolate time values (smooth increments)
             output = interpolate(output)
+
+            # apply filtering + normalisation to channels
+            for channel in channels:
+                output[channel] = normalise(bpass_filter(output[channel].values, lowcut=5, highcut=15, fs=256, order=5))
 
             return output
 
@@ -278,9 +290,12 @@ def main():
     print(f'Number of class 1 trials: {len(times_1)}')
     print(f'Number of class 2 trials: {len(times_2)}')
 
-    # match up label timestamps with signal data in DataFrame
-    assign_trials(np.array(df['time']), times_1, times_2)
 
+    # match up label timestamps with signal data in DataFrame
+    X1 = assign_trials(df, times_1)
+    X2 = assign_trials(df, times_2)
+
+    print(f'Input data shape: {X2.shape}')
 
     # pass data through spatial filters
     X1, X2 = csp(X1=X1, X2=X2)

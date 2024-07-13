@@ -72,11 +72,10 @@ def main():
         "label": [-1, 1],
         "relax": "Relax"
     }
-    n_iters = 4                                         # total number of prompts that will appear
+    n_iters = 8                                         # total number of prompts that will appear (includes relaxation)
     interval = 4                                        # length of each prompt (seconds)
     eeg_iters = (n_iters * interval) * 16               # set stopping point for EEG
     next_time = time.time() + interval
-    action_flag = True
     current_task = ""
     timestamps = []
 
