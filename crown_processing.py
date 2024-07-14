@@ -31,13 +31,46 @@ def compute_psd(tensor):
     '''
     :param takes in 3D tensor of shape (n_trials, n_channels, n_samples)
     :return:
-    power spectral density of each shape (n_trials, n_channels, ceil(n_samples+1/2))
+    power spectral density of each shape (n_trials, n_channels, n_samples/2 + 1)
     freqs of shape ceil(n_samples+1/2))
     '''
 
     freqs, PSD = scipy.signal.welch(tensor, fs=265, axis=2, nperseg=tensor.shape[2])
+    print(PSD.shape)
 
     return np.array(freqs), np.array(PSD)
+
+def plot_psd(freqs, P1, P2):
+    '''
+    :params P1, P2: shape (n_trials, n_channels, n_samples/2 + 1)
+    '''
+
+    channel_names = ['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6', 'C4', 'CP4']
+
+    # Create subplots
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 5))
+
+    # plot the first and last eigenvectors (the most extreme discrimination)
+    ax1.plot(freqs, P1[:, 0, :].mean(axis=0), color='red', linewidth=1, label='right')
+    ax1.plot(freqs, P2[:, 0, :].mean(axis=0), color='blue', linewidth=1, label='left')
+    ax1.set_title(f'PSD for {channel_names[1]} (controls right side)')
+    ax1.set_xlabel('Frequency (Hz)')
+    ax1.set_ylabel('Power Spectral Density')
+    ax1.set_xlim(0, 30)
+    ax1.set_ylim(1, 20)
+    ax1.legend()
+
+    ax2.plot(freqs, P1[:, -1, :].mean(axis=0), color='red', linewidth=1, label='right')
+    ax2.plot(freqs, P2[:, -1, :].mean(axis=0), color='blue', linewidth=1, label='left')
+    ax2.set_title(f'PSD for {channel_names[6]} (controls left side)')
+    ax2.set_xlabel('Frequency (Hz)')
+    ax2.set_ylabel('Power Spectral Density')
+    ax2.set_xlim(0, 30)
+    ax2.set_ylim(1, 20)
+    ax2.legend()
+
+    plt.tight_layout()
+    plt.show()
 
 def logvar(PSD):
     '''
@@ -48,80 +81,46 @@ def logvar(PSD):
 
     return np.log(np.var(PSD, axis=2))
 
-def plot_psd(freqs, P1, P2):
+def bar_logvar(L1, L2):
+    '''
+    Plot logvar bar chart of all channels to compare variance of each channel
+    :param L1: shape (n_trials, n_channels)
+    '''
 
-    # Create subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 5))
+    plt.figure(figsize=(8, 5))
 
-    # plot the first and last eigenvectors (the most extreme discrimination)
-    ax1.plot(freqs, P1[:, 0, :].mean(axis=0), color='red', linewidth=1, label='right')
-    ax1.plot(freqs, P2[:, 0, :].mean(axis=0), color='blue', linewidth=1, label='left')
-    # ax1.set_title(f'PSD for {channel_names[1]} (controls right side)')
-    ax1.set_xlabel('Frequency (Hz)')
-    ax1.set_ylabel('Power Spectral Density')
-    ax1.set_xlim(0, 30)
-    ax1.set_ylim(1, 50)
-    ax1.legend()
-
-    ax2.plot(freqs, P1[:, -1, :].mean(axis=0), color='red', linewidth=1, label='right')
-    ax2.plot(freqs, P2[:, -1, :].mean(axis=0), color='blue', linewidth=1, label='left')
-    # ax2.set_title(f'PSD for {channel_names[6]} (controls left side)')
-    ax2.set_xlabel('Frequency (Hz)')
-    ax2.set_ylabel('Power Spectral Density')
-    ax2.set_xlim(0, 30)
-    ax2.set_ylim(1, 50)
-    ax2.legend()
-
-    plt.tight_layout()
-    plt.show()
-
-def scatter_logvar(L1, L2):
-
-    # plot logvar data of most discriminative eigenvectors
-
-    fig, (ax1) = plt.subplots(1, 1, figsize=(5, 5))
-
-    ax1.scatter(L1[:, 0], L1[:, -1], color='red', linewidth=1, label='right')
-    ax1.scatter(L1[:, 0], L2[:, -1], color='blue', linewidth=1, label='left')
-    ax1.legend()
-
-    plt.show()
-
-def plot_logvar(L1, L2):
-
-    # bar chart plot of post-CSP log variance
-
-    plt.figure(figsize=(8,5))
-
-    x0 = np.arange(L1.shape[1])
+    x0 = np.arange(L1.shape[1])                     # x axis = number of channels
     x1 = np.arange(L1.shape[1]) + 0.4
 
-    y0 = np.mean(L1, axis=0)
+    y0 = np.mean(L1, axis=0)                        # y axis = log variance averaged over trials
     y1 = np.mean(L2, axis=0)
 
-    plt.bar(x0, y0, width=0.4, color='r')
-    plt.bar(x1, y1, width=0.4, color='b')
-
-    plt.xlim(-0.5, L1.shape[1] + 0.5)
+    plt.bar(x0, y0, width=0.4, color='red', label='right')
+    plt.bar(x1, y1, width=0.4, color='blue', label='left')
 
     plt.gca().yaxis.grid(True)
     plt.title('log-var of each channel/component')
     plt.xlabel('channels/components')
     plt.ylabel('log-var')
+    plt.legend()
 
     plt.show()
 
     return
 
-def whitening_matrix(sigma):
+def scatter_logvar(L1, L2):
+    '''
+    Plot logvar scatter data of channels of interest OR most disriminative eigenvectors (1 point = 1 trial)
+    :params L1,L2: shape (n_trials, n_channels)
+    '''
 
-    # eigendecomposition of composite covariance matrix
-    U, D, _ = np.linalg.svd(sigma)
+    plt.figure(figsize=(8, 5))
 
-    # W = np.dot(U, np.dot(np.diag(1.0 / np.sqrt(D + 1e-5)), U.T))               # ZCA
-    # W = np.dot(np.diag(1.0 / np.sqrt(D + 1e-5)), U.T)                          # PCA
+    plt.scatter(L1[:, 0], L1[:, -1], color='red', linewidth=1, label='right')
+    plt.scatter(L2[:, 0], L2[:, -1], color='blue', linewidth=1, label='left')
+    plt.legend()
 
-    return np.dot(np.diag(D ** -0.5), U.T)
+    plt.show()
 
 
 def spatial_filter(X1, X2):
@@ -131,9 +130,18 @@ def spatial_filter(X1, X2):
     X1, X2: Shape = (n_trials, n_channels, n_samples)
     """
 
+    def whitening_matrix(sigma):
+        # eigendecomposition of composite covariance matrix
+        U, D, _ = np.linalg.svd(sigma)
+
+        # W = np.dot(U, np.dot(np.diag(1.0 / np.sqrt(D + 1e-5)), U.T))               # ZCA
+
+        # W output using PCA method
+        return np.dot(np.diag(D ** -0.5), U.T)
+
     # calculate covariance matrices
-    R1 = np.mean([np.dot(x, x.T) for x in X1], axis=0)
-    R2 = np.mean([np.dot(x, x.T) for x in X2], axis=0)
+    R1 = np.mean([np.dot(X, X.T) for X in X1], axis=0)
+    R2 = np.mean([np.dot(X, X.T) for X in X2], axis=0)
 
     print(f'Cov shape: {R1.shape}')                                 # shape (n_channels, n_channels)
 
@@ -153,17 +161,23 @@ def spatial_filter(X1, X2):
 
     # solve generalised eigenvalue problem to get spatial filters
     d, W = la.eigh(S1, S1+S2)
-    idx = np.argsort(d)[::-1]
-    W = W[:,idx]
+
+    # sort eigenvalues in descending order
+    # idx = np.argsort(d)[::-1]
+    # d = d[idx]
+    # W = W[idx, :]
+
+    # keep first and last eigenvectors
+    # W = np.vstack([W[0, :], W[-1, :]])
+    print(f'Spatial filter: {W}')
+
     # eigenvectors == spatial filters == projection matrix
     print(f'Discriminative eigenvalues {d}')
     print(f'Spatial filter shape: {W.shape}')
 
-    # W = np.column_stack((W[:, 0], W[:, -1]))
-
     # project data onto spatial filters
-    X1_csp = np.stack([np.dot(W.T, trial) for trial in X1])
-    X2_csp = np.stack([np.dot(W.T, trial) for trial in X2])
+    X1_csp = np.stack([np.dot(W, trial) for trial in X1])
+    X2_csp = np.stack([np.dot(W, trial) for trial in X2])
 
     print(f'Data after spatial filtering shape: {X1_csp.shape}')
 
@@ -236,7 +250,8 @@ def main():
 
             # apply filtering + normalisation to channel signals
             for channel in channels:
-                df[channel] = normalise(bpass_filter(df[channel].values, lowcut=5, highcut=15, fs=256, order=5))
+                # df[channel] = normalise(df[channel].values)     # no bandpass (for plotting)
+                df[channel] = normalise(bpass_filter(df[channel].values, lowcut=7, highcut=20, fs=256, order=5))
 
             return df
 
@@ -307,6 +322,7 @@ def main():
     # get Log Variance
     L1 = logvar(P1)
     L2 = logvar(P2)
+    bar_logvar(L1,L2)
     scatter_logvar(L1,L2)
 
     return

@@ -60,7 +60,7 @@ def main():
     pygame.init()
     pygame.font.init()
     width, height = 600, 600
-    os.environ['SDL_VIDEO_WINDOW_POS'] = "0,0"  # Position window at top-left
+    # os.environ['SDL_VIDEO_WINDOW_POS'] = "0,0"  # Position window at top-left
     screen = pygame.display.set_mode((width, height), pygame.NOFRAME)
     pygame.display.set_allow_screensaver(False)
     font = pygame.font.Font(None, 36)
@@ -72,9 +72,12 @@ def main():
         "label": [-1, 1],
         "relax": "Relax"
     }
-    n_iters = 8                                         # total number of prompts that will appear (includes relaxation)
-    interval = 4                                        # length of each prompt (seconds)
-    eeg_iters = (n_iters * interval) * 16               # set stopping point for EEG
+
+    n_trials = 20                                # set this - number of desired trials for EACH class
+    interval = 4                                 # set this - length of each prompt (seconds)
+
+    n_iters = n_trials*4 + 1                     # total number of prompts that will appear (includes relaxation)
+    eeg_iters = (n_iters * interval) * 16        # set stopping point for EEG
     next_time = time.time() + interval
     current_task = ""
     timestamps = []
