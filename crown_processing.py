@@ -7,7 +7,7 @@ import json
 import scipy.io
 from scipy.signal import butter, filtfilt
 import numpy as np
-import scipy.linalg as la
+import scipy.linalg
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
@@ -132,9 +132,9 @@ def spatial_filter(X1, X2):
 
     def whitening_matrix(sigma):
         # eigendecomposition of composite covariance matrix
-        U, D, _ = np.linalg.svd(sigma)
+        D, U = np.linalg.eigh(sigma)
 
-        # W = np.dot(U, np.dot(np.diag(1.0 / np.sqrt(D + 1e-5)), U.T))               # ZCA
+        # W = np.dot(U, np.dot(np.diag(D ** -0.5), U.T))               # ZCA
 
         # W output using PCA method
         return np.dot(np.diag(D ** -0.5), U.T)
@@ -156,23 +156,19 @@ def spatial_filter(X1, X2):
     # print(S1+S2)
     # == identity matrix
 
-    # D1, V1, _ = np.linalg.svd(S1)
-    # D2, V2, _ = np.linalg.svd(S2)
-
     # solve generalised eigenvalue problem to get spatial filters
-    d, W = la.eigh(S1, S1+S2)
+    d, W = scipy.linalg.eigh(S1, S1+S2)
 
     # sort eigenvalues in descending order
-    # idx = np.argsort(d)[::-1]
-    # d = d[idx]
-    # W = W[idx, :]
+    idx = np.argsort(d)[::-1]
+    d = d[idx]
+    W = W[:, idx]
+    print(f'Discriminative eigenvalues {d}')
 
     # keep first and last eigenvectors
-    # W = np.vstack([W[0, :], W[-1, :]])
-    print(f'Spatial filter: {W}')
+    # W = np.vstack([W[:, 0], W[:, -1]])
 
     # eigenvectors == spatial filters == projection matrix
-    print(f'Discriminative eigenvalues {d}')
     print(f'Spatial filter shape: {W.shape}')
 
     # project data onto spatial filters
