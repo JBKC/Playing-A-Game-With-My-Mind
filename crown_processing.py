@@ -12,34 +12,6 @@ import os
 import pandas as pd
 import matplotlib.pyplot as plt
 
-
-def bpass_filter(data, lowcut, highcut, fs, order=5):
-    nyquist = 0.5 * fs
-    low = lowcut / nyquist
-    high = highcut / nyquist
-    b, a = butter(order, [low, high], btype='band')
-    return filtfilt(b, a, data)
-
-def normalise(signal):
-    # zero mean the signal
-    signal = signal - np.mean(signal)
-    # can crop to get rid of edge effects (to update with more elegant method)
-    # 100 samples = 490ms
-    return signal
-
-def compute_psd(tensor):
-    '''
-    :param takes in 3D tensor of shape (n_trials, n_channels, n_samples)
-    :return:
-    power spectral density of each shape (n_trials, n_channels, n_samples/2 + 1)
-    freqs of shape ceil(n_samples+1/2))
-    '''
-
-    freqs, PSD = scipy.signal.welch(tensor, fs=265, axis=2, nperseg=tensor.shape[2])
-    print(PSD.shape)
-
-    return np.array(freqs), np.array(PSD)
-
 def plot_psd(freqs, P1, P2):
     '''
     :params P1, P2: shape (n_trials, n_channels, n_samples/2 + 1)
@@ -53,7 +25,7 @@ def plot_psd(freqs, P1, P2):
     # plot the first and last eigenvectors (the most extreme discrimination)
     ax1.plot(freqs, P1[:, 0, :].mean(axis=0), color='red', linewidth=1, label='right')
     ax1.plot(freqs, P2[:, 0, :].mean(axis=0), color='blue', linewidth=1, label='left')
-    ax1.set_title(f'PSD for {channel_names[1]} (controls right side)')
+    # ax1.set_title(f'PSD for {channel_names[1]} (controls right side)')
     ax1.set_xlabel('Frequency (Hz)')
     ax1.set_ylabel('Power Spectral Density')
     ax1.set_xlim(0, 30)
@@ -62,7 +34,7 @@ def plot_psd(freqs, P1, P2):
 
     ax2.plot(freqs, P1[:, -1, :].mean(axis=0), color='red', linewidth=1, label='right')
     ax2.plot(freqs, P2[:, -1, :].mean(axis=0), color='blue', linewidth=1, label='left')
-    ax2.set_title(f'PSD for {channel_names[6]} (controls left side)')
+    # ax2.set_title(f'PSD for {channel_names[6]} (controls left side)')
     ax2.set_xlabel('Frequency (Hz)')
     ax2.set_ylabel('Power Spectral Density')
     ax2.set_xlim(0, 30)
@@ -122,6 +94,31 @@ def scatter_logvar(L1, L2):
 
     plt.show()
 
+def bpass_filter(data, lowcut, highcut, fs, order=5):
+
+    # signal params
+    nyquist = 0.5 * fs
+    low = lowcut / nyquist
+    high = highcut / nyquist
+    b, a = butter(order, [low, high], btype='band')
+
+    return filtfilt(b, a, data, axis=2)
+
+def normalise(signal):
+    # zero mean the signal
+    return signal - np.mean(signal)
+
+def compute_psd(tensor):
+    '''
+    :param takes in 3D tensor of shape (n_trials, n_channels, n_samples)
+    :return:
+    power spectral density of each shape (n_trials, n_channels, n_samples/2 + 1)
+    freqs of shape ceil(n_samples+1/2))
+    '''
+
+    freqs, PSD = scipy.signal.welch(tensor, fs=265, axis=2, nperseg=tensor.shape[2])
+
+    return np.array(freqs), np.array(PSD)
 
 def spatial_filter(X1, X2):
     """
@@ -181,6 +178,10 @@ def spatial_filter(X1, X2):
     return X1_csp, X2_csp
 
 def main():
+    '''
+    Main function for extracting and processing data for input into model
+    :return: 2D matrix of shape (n_trials, n_CSP_components)
+    '''
 
     def interpolate(stream):
         '''
@@ -243,30 +244,33 @@ def main():
             stream = np.array(stream)
             stream = interpolate(stream)
 
-            # filter + normalise each channel's shape
-            for i in range(1, stream.shape[1]):
-                stream[:,i] = bpass_filter(stream[:,i], lowcut=8, highcut=15, fs=256, order=5)
-
             return stream
 
-    def assign_trials(stream, onsets):
+    def assign_trials(stream, onsets, full_window=True):
         '''
         Slice up and append trials using timestamps from label data
         :params:
             stream: 2D array of session
             onsets: list of class onset timestamps
+            full_window: flag to choose whether to take full 4s period after onset or 0.5-2.5s period post-onset
         :return: 3D tensor of shape (n_trials, n_channels, n_samples)
         '''
 
-        window = 1024                               # = prompt length (4 seconds) * fs (256 Hz)
+        if full_window:
+            window = 1024                           # = prompt length (4 seconds) * fs (256 Hz)
+            delay = 0
+        if not full_window:
+            window = 640
+            delay = int(256/0.5)
+
         times = stream[:,0]
         time_idx = []                               # list of signal times that lie within a trial window
 
         # iterate through onset times
         for trial in onsets:
-            start_idx = np.where(times >= trial)[0][0]              # get index of start of trial in signal
-            end_idx = min(start_idx + window, len(times))           # end index of trial in signal
-            time_idx.append(np.arange(start_idx,end_idx))           # range of trial indices
+            start_idx = np.where(times >= trial)[0][0] + delay                # get index of start of trial in signal
+            end_idx = min(start_idx + window, len(times))                     # end index of trial in signal
+            time_idx.append(np.arange(start_idx,end_idx))                     # range of trial indices
 
         # create training tensor
         trials = stream[:,1:]
@@ -302,31 +306,35 @@ def main():
     print(f'Number of class 2 trials: {len(onsets_2)}')
 
     # match up class onsets with signal data in DataFrame
-    X1 = assign_trials(stream, onsets_1)                                # X1 = right
-    X2 = assign_trials(stream, onsets_2)                                # X2 = left
+    X1 = assign_trials(stream, onsets_1, full_window=False)                                # X1 = right
+    X2 = assign_trials(stream, onsets_2, full_window=False)                                # X2 = left
 
-    print(f'Input data shape: {X1.shape}')
+    print(f'Signal tensor shape: {X1.shape}')
 
-    # bandpass filter
-    # X1 = normalise(bpass_filter(X1, 8, 15, 256))
-    # X2 = normalise(bpass_filter(X2, 8, 15, 256))
-
+    # bandpass filter & normalise
+    X1 = normalise(bpass_filter(X1, 8, 15, 256))
+    X2 = normalise(bpass_filter(X2, 8, 15, 256))
 
     # pass data through spatial filters using CSP
     X1, X2 = spatial_filter(X1=X1, X2=X2)
 
-    # get Power Spectral Densities
+    # get Power Spectral Densities from spatially filtered data
     freqs, P1 = compute_psd(X1)
     _, P2 = compute_psd(X2)
-    plot_psd(freqs, P1, P2)
 
     # get Log Variance
     L1 = logvar(X1)
     L2 = logvar(X2)
+
+    # plots
+    plot_psd(freqs, P1, P2)
     bar_logvar(L1,L2)
     scatter_logvar(L1,L2)
 
-    return
+    print(f'Input data shape: {L1.shape}')
+
+    # return log variance as input into models
+    return L1, L2
 
 
 if __name__ == '__main__':
