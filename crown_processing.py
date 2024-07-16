@@ -130,54 +130,80 @@ def spatial_filter(X1, X2):
     X1, X2: Shape = (n_trials, n_channels, n_samples)
     """
 
+    def cov(X):
+        '''
+        Take in 3D tensor X of shape (n_trials, n_channels, n_samples)
+        Calculates the covariance matrix of shape (n_channels, n_channels)
+        Returns average of covs over all trials
+        '''
+        n_samples = X.shape[2]
+        covs = [np.dot(X, X.T) / n_samples]
+
+        return np.mean(covs, axis=0)
+
     def whitening_matrix(sigma):
         # eigendecomposition of composite covariance matrix
-        D, U = np.linalg.eigh(sigma)
 
+        # D, U = np.linalg.eigh(sigma)
         # W = np.dot(U, np.dot(np.diag(D ** -0.5), U.T))               # ZCA
+        # W = np.dot(np.diag(D ** -0.5), U.T)                          # PCA
 
-        # W output using PCA method
-        return np.dot(np.diag(D ** -0.5), U.T)
+        U, l, _ = np.linalg.svd(sigma)
+        return U.dot(np.diag(l ** -0.5))
 
     # calculate covariance matrices
-    R1 = np.mean([np.dot(X, X.T) for X in X1], axis=0)
-    R2 = np.mean([np.dot(X, X.T) for X in X2], axis=0)
+    R1 = cov(X1)
+    R2 = cov(X2)
 
-    print(f'Cov shape: {R1.shape}')                                 # shape (n_channels, n_channels)
+    print(f'Covariance matrix  shape: {R1.shape}')                    # shape (n_channels, n_channels)
 
     # get whitening matrix P from composite covariance matrix
     P = whitening_matrix(R1 + R2)
-    print(f'Whitening matrix shape: {P.shape}')                     # shape (n_channels, n_channels)
+    print(f'Whitening matrix shape: {P.shape}')                       # shape (n_channels, n_channels)
 
-    # whiten individual covariance matrices
-    S1 = np.dot(np.dot(P, R1), P.T)
-    S2 = np.dot(np.dot(P, R2), P.T)
+    S = P.T.dot(R1).dot(P)
 
-    # print(S1+S2)
-    # == identity matrix
+    U, d, _ = scipy.linalg.svd(S)
+    W = np.dot(U.T,P)
 
-    # solve generalised eigenvalue problem to get spatial filters
-    d, W = scipy.linalg.eigh(S1, S1+S2)
-
-    # sort eigenvalues in descending order
-    idx = np.argsort(d)[::-1]
-    d = d[idx]
-    W = W[:, idx]
     print(f'Discriminative eigenvalues {d}')
 
-    # keep first and last eigenvectors
+    print(W.shape)
+
+
+
+    # # whiten individual covariance matrices
+    # S1 = np.dot(np.dot(P, R1), P.T)
+    # S2 = np.dot(np.dot(P, R2), P.T)
+    #
+    # # print(S1+S2)
+    # # == identity matrix
+    #
+    # # solve generalised eigenvalue problem to get spatial filters
+    # d, W = scipy.linalg.eigh(S1, S1+S2)
+    #
+    # # sort eigenvalues in descending order
+    # idx = np.argsort(d)[::-1]
+    # d = d[idx]
+    # W = W[:, idx]
+    # print(f'Discriminative eigenvalues {d}')
+    #
+    # # Whiten the output
+    # W = np.dot(W, P.T)
+    #
+    # # keep first and last eigenvectors
     # W = np.vstack([W[:, 0], W[:, -1]])
-
-    # eigenvectors == spatial filters == projection matrix
-    print(f'Spatial filter shape: {W.shape}')
-
-    # project data onto spatial filters
-    X1_csp = np.stack([np.dot(W, trial) for trial in X1])
-    X2_csp = np.stack([np.dot(W, trial) for trial in X2])
-
-    print(f'Data after spatial filtering shape: {X1_csp.shape}')
-
-    return X1_csp, X2_csp
+    #
+    # # eigenvectors == spatial filters == projection matrix
+    # print(f'Spatial filter shape: {W.shape}')
+    #
+    # # project data onto spatial filters
+    # X1_csp = np.stack([np.dot(W, trial) for trial in X1])
+    # X2_csp = np.stack([np.dot(W, trial) for trial in X2])
+    #
+    # print(f'Data after spatial filtering shape: {X1_csp.shape}')
+    #
+    # return X1_csp, X2_csp
 
 def main():
 
@@ -247,7 +273,7 @@ def main():
             # apply filtering + normalisation to channel signals
             for channel in channels:
                 # df[channel] = normalise(df[channel].values)     # no bandpass (for plotting)
-                df[channel] = normalise(bpass_filter(df[channel].values, lowcut=7, highcut=20, fs=256, order=5))
+                df[channel] = normalise(bpass_filter(df[channel].values, lowcut=5, highcut=15, fs=256, order=5))
 
             return df
 
@@ -302,8 +328,8 @@ def main():
     print(f'Number of class 2 trials: {len(onsets_2)}')
 
     # match up class onsets with signal data in DataFrame
-    X1 = assign_trials(df, onsets_1)
-    X2 = assign_trials(df, onsets_2)
+    X1 = assign_trials(df, onsets_1)                                # X1 = right
+    X2 = assign_trials(df, onsets_2)                                # X2 = left
 
     print(f'Input data shape: {X1.shape}')
 
@@ -316,8 +342,8 @@ def main():
     plot_psd(freqs, P1, P2)
 
     # get Log Variance
-    L1 = logvar(P1)
-    L2 = logvar(P2)
+    L1 = logvar(X1)
+    L2 = logvar(X2)
     bar_logvar(L1,L2)
     scatter_logvar(L1,L2)
 
