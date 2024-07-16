@@ -182,15 +182,17 @@ def spatial_filter(X1, X2):
 
 def main():
 
-    def interpolate(output):
+    def interpolate(stream):
         '''
         Custom function for interpolating Crown time output to get continuous timestamps
         Required because each datapacket of 16 points all share the same timestamp
-        :param output: DataFrame of session
-        :return: edited DataFrame with interpolated times
+        :param output: 2D array of whole session
+        :return: edited 2D array with interpolated times
         '''
 
-        times = output['time']
+        # timestamps in the first column
+        times = stream[:,0]
+
         # window in segments of 16+1
         step = 16
         n_windows = int(len(times) / step)
@@ -210,70 +212,65 @@ def main():
             correction = end - (end - start) * 1 / step     # correct to end of packet i (rather than beginning of packet i+1)
             new_times.extend(np.linspace(start, correction, step))
 
-        output['time'] = new_times
-        # output.to_json('output.json', orient='records', lines=True)
+        stream[:, 0] = new_times
 
-        return output
+        return stream
 
-    def get_dataframe():
+    def get_data():
         '''
-        Extracts, processes and reformats raw signal data from JSON file
+        Extracts, reformats and preprocesses raw signal data from JSON file
         Contains list of dictionaries of length n_iterations (1 iteration = 16 datapoints for each of 8 channels)
-        :return: pandas Dataframe of shape (n_samples, n_channels)
+        :return: 2D array of shape (n_samples, (time channel + n_EEG_channels))
         '''
 
         with open(os.path.join(folder, session), 'r') as f:
             data = json.load(f)
 
-            df = pd.DataFrame()         # output dataframe for holding entire session's data (all trials)
-            stream = {}                 # individual streams within output dataframe
+            stream = []                 # array for individual streams to be appended to. of shape (n_channels, n_total_samples)
 
             # pull individual dictionaries (datapackets)
             for packet in data:
                 channels = packet['info']['channelNames']
-                signals = packet['data']
-                stream['time'] = packet['info']['startTime'] / 1000      # convert to seconds to match label data
+                signals = np.array(packet['data'])
+                time = packet['info']['startTime'] / 1000      # convert to seconds to match label data
 
-                # reformat channel data
-                for i, channel in enumerate(channels):
-                    stream[channel] = signals[i]
-
-                # add stream into output dataframe
-                stream = pd.DataFrame(stream)
-                df = pd.concat([df, stream], ignore_index=True)
+                # append each row to stream
+                for i in range(signals.shape[1]):
+                    row = [time] + signals[:, i].tolist()
+                    stream.append(row)
 
             # interpolate time values (smooth increments)
-            df = interpolate(df)
+            stream = np.array(stream)
+            stream = interpolate(stream)
 
-            # # apply filtering + normalisation to channel signals
-            # for channel in channels:
-            #     # print(channel)
-            #     # print(df[channel].values)
-            #     # df[channel] = normalise(df[channel].values)     # no bandpass (for plotting)
-            #     df[channel] = bpass_filter(df[channel].values, lowcut=8, highcut=15, fs=256, order=5)
+            # filter + normalise each channel's shape
+            for i in range(1, stream.shape[1]):
+                stream[:,i] = bpass_filter(stream[:,i], lowcut=8, highcut=15, fs=256, order=5)
 
-            return df
+            return stream
 
-    def assign_trials(df, onsets):
+    def assign_trials(stream, onsets):
         '''
         Slice up and append trials using timestamps from label data
-        :param df: DataFrame of session; onsets: list of class onset timestamps
-        :return: tensor of shape (n_trials, n_channels, n_samples)
+        :params:
+            stream: 2D array of session
+            onsets: list of class onset timestamps
+        :return: 3D tensor of shape (n_trials, n_channels, n_samples)
         '''
 
-        window = 1024                               # prompt length (4 seconds) * fs (256 Hz)
-        signal_times = np.array(df['time'])
-        data = []                                   # list of dataframes
+        window = 1024                               # = prompt length (4 seconds) * fs (256 Hz)
+        times = stream[:,0]
+        time_idx = []                               # list of signal times that lie within a trial window
 
         # iterate through onset times
         for trial in onsets:
-            start_idx = np.where(signal_times >= trial)[0][0]           # get index of start of trial in signal
-            end_idx = min(start_idx + window, len(signal_times))        # end index of trial
-            idx = np.arange(start_idx,end_idx)
-            data.append(df.iloc[idx])
+            start_idx = np.where(times >= trial)[0][0]              # get index of start of trial in signal
+            end_idx = min(start_idx + window, len(times))           # end index of trial in signal
+            time_idx.append(np.arange(start_idx,end_idx))           # range of trial indices
 
         # create training tensor
-        tensor = np.stack([df.drop(columns=['time']).values for df in data])
+        trials = stream[:,1:]
+        tensor = np.stack([trials[idx,:] for idx in time_idx])
 
         # output tensor is shape (n_trials, n_channels, n_samples)
         return np.transpose(tensor, (0, 2, 1))
@@ -286,9 +283,9 @@ def main():
         # pull continuous signal data
         if 'eeg_stream' in session:
             # extract list of dictionaries (datapackets) into one dataframe
-            df = get_dataframe()
+            stream = get_data()
 
-            print(f'All data shape: {df.shape}')
+            print(f'All data shape: {stream.shape}')
 
         # pull trial labels
         if 'labels' in session:
@@ -305,16 +302,15 @@ def main():
     print(f'Number of class 2 trials: {len(onsets_2)}')
 
     # match up class onsets with signal data in DataFrame
-    X1 = assign_trials(df, onsets_1)                                # X1 = right
-    X2 = assign_trials(df, onsets_2)                                # X2 = left
+    X1 = assign_trials(stream, onsets_1)                                # X1 = right
+    X2 = assign_trials(stream, onsets_2)                                # X2 = left
 
     print(f'Input data shape: {X1.shape}')
 
     # bandpass filter
-    X1 = bpass_filter(X1, 8, 15, 256)
-    X2 = bpass_filter(X2, 8, 15, 256)
-    # plt.plot(X1[0][0])
-    # plt.show()
+    # X1 = normalise(bpass_filter(X1, 8, 15, 256))
+    # X2 = normalise(bpass_filter(X2, 8, 15, 256))
+
 
     # pass data through spatial filters using CSP
     X1, X2 = spatial_filter(X1=X1, X2=X2)
