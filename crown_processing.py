@@ -57,7 +57,7 @@ def plot_psd(freqs, P1, P2):
     ax1.set_xlabel('Frequency (Hz)')
     ax1.set_ylabel('Power Spectral Density')
     ax1.set_xlim(0, 30)
-    ax1.set_ylim(1, 20)
+    ax1.set_ylim(0, 1)
     ax1.legend()
 
     ax2.plot(freqs, P1[:, -1, :].mean(axis=0), color='red', linewidth=1, label='right')
@@ -66,7 +66,7 @@ def plot_psd(freqs, P1, P2):
     ax2.set_xlabel('Frequency (Hz)')
     ax2.set_ylabel('Power Spectral Density')
     ax2.set_xlim(0, 30)
-    ax2.set_ylim(1, 20)
+    ax2.set_ylim(0, 1)
     ax2.legend()
 
     plt.tight_layout()
@@ -134,41 +134,42 @@ def spatial_filter(X1, X2):
         '''
         Take in 3D tensor X of shape (n_trials, n_channels, n_samples)
         Calculates the covariance matrix of shape (n_channels, n_channels)
+        Normalise the covs by dividing by number of samples
         Returns average of covs over all trials
         '''
         n_samples = X.shape[2]
-        covs = [np.dot(X, X.T) / n_samples]
+        covs = [np.dot(trial, trial.T) / n_samples for trial in X]
 
         return np.mean(covs, axis=0)
 
     def whitening_matrix(sigma):
         # eigendecomposition of composite covariance matrix
+        D, U = np.linalg.eigh(sigma)
 
-        # D, U = np.linalg.eigh(sigma)
         # W = np.dot(U, np.dot(np.diag(D ** -0.5), U.T))               # ZCA
-        # W = np.dot(np.diag(D ** -0.5), U.T)                          # PCA
-
-        U, l, _ = np.linalg.svd(sigma)
-        return U.dot(np.diag(l ** -0.5))
+        # PCA method:
+        return np.dot(np.diag(D ** -0.5), U.T)
 
     # calculate covariance matrices
     R1 = cov(X1)
     R2 = cov(X2)
-
     print(f'Covariance matrix  shape: {R1.shape}')                    # shape (n_channels, n_channels)
 
     # get whitening matrix P from composite covariance matrix
     P = whitening_matrix(R1 + R2)
     print(f'Whitening matrix shape: {P.shape}')                       # shape (n_channels, n_channels)
 
-    S = P.T.dot(R1).dot(P)
+    # S = np.dot(np.dot(P.T, R1), P)
+    S = np.dot(np.dot(P, R1), P.T)
 
     U, d, _ = scipy.linalg.svd(S)
-    W = np.dot(U.T,P)
-
     print(f'Discriminative eigenvalues {d}')
 
-    print(W.shape)
+    W = np.dot(P.T ,U)
+
+    # project spatial filters onto data
+    X1_csp = np.stack([np.dot(W.T, trial) for trial in X1])
+    X2_csp = np.stack([np.dot(W.T, trial) for trial in X2])
 
 
 
@@ -203,7 +204,7 @@ def spatial_filter(X1, X2):
     #
     # print(f'Data after spatial filtering shape: {X1_csp.shape}')
     #
-    # return X1_csp, X2_csp
+    return X1_csp, X2_csp
 
 def main():
 
@@ -270,10 +271,12 @@ def main():
             # interpolate time values (smooth increments)
             df = interpolate(df)
 
-            # apply filtering + normalisation to channel signals
-            for channel in channels:
-                # df[channel] = normalise(df[channel].values)     # no bandpass (for plotting)
-                df[channel] = normalise(bpass_filter(df[channel].values, lowcut=5, highcut=15, fs=256, order=5))
+            # # apply filtering + normalisation to channel signals
+            # for channel in channels:
+            #     # print(channel)
+            #     # print(df[channel].values)
+            #     # df[channel] = normalise(df[channel].values)     # no bandpass (for plotting)
+            #     df[channel] = bpass_filter(df[channel].values, lowcut=8, highcut=15, fs=256, order=5)
 
             return df
 
@@ -332,6 +335,12 @@ def main():
     X2 = assign_trials(df, onsets_2)                                # X2 = left
 
     print(f'Input data shape: {X1.shape}')
+
+    # bandpass filter
+    X1 = bpass_filter(X1, 8, 15, 256)
+    X2 = bpass_filter(X2, 8, 15, 256)
+    # plt.plot(X1[0][0])
+    # plt.show()
 
     # pass data through spatial filters using CSP
     X1, X2 = spatial_filter(X1=X1, X2=X2)
