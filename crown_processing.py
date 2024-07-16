@@ -146,8 +146,7 @@ def spatial_filter(X1, X2):
         # eigendecomposition of composite covariance matrix
         D, U = np.linalg.eigh(sigma)
 
-        # W = np.dot(U, np.dot(np.diag(D ** -0.5), U.T))               # ZCA
-        # PCA method:
+        # use PCA whitening (without transformation back into original space)
         return np.dot(np.diag(D ** -0.5), U.T)
 
     # calculate covariance matrices
@@ -159,51 +158,26 @@ def spatial_filter(X1, X2):
     P = whitening_matrix(R1 + R2)
     print(f'Whitening matrix shape: {P.shape}')                       # shape (n_channels, n_channels)
 
-    # S = np.dot(np.dot(P.T, R1), P)
-    S = np.dot(np.dot(P, R1), P.T)
+    # whiten covariance matrices
+    S1 = np.dot(np.dot(P, R1), P.T)
+    S2 = np.dot(np.dot(P, R2), P.T)
 
-    U, d, _ = scipy.linalg.svd(S)
-    print(f'Discriminative eigenvalues {d}')
+    # solve generalised eigenvalue problem
+    D, U = scipy.linalg.eigh(S1, S1+S2)
 
-    W = np.dot(P.T ,U)
+    # sort eigenvalues in descending order
+    idx = np.argsort(D)[::-1]
+    D = D[idx]
+    W = U[:, idx]               # W == spatial filters
+    print(f'Discriminative eigenvalues {D}')
+
+    # transform spatial filters back into original space
+    W = np.dot(P.T ,W)
 
     # project spatial filters onto data
     X1_csp = np.stack([np.dot(W.T, trial) for trial in X1])
     X2_csp = np.stack([np.dot(W.T, trial) for trial in X2])
 
-
-
-    # # whiten individual covariance matrices
-    # S1 = np.dot(np.dot(P, R1), P.T)
-    # S2 = np.dot(np.dot(P, R2), P.T)
-    #
-    # # print(S1+S2)
-    # # == identity matrix
-    #
-    # # solve generalised eigenvalue problem to get spatial filters
-    # d, W = scipy.linalg.eigh(S1, S1+S2)
-    #
-    # # sort eigenvalues in descending order
-    # idx = np.argsort(d)[::-1]
-    # d = d[idx]
-    # W = W[:, idx]
-    # print(f'Discriminative eigenvalues {d}')
-    #
-    # # Whiten the output
-    # W = np.dot(W, P.T)
-    #
-    # # keep first and last eigenvectors
-    # W = np.vstack([W[:, 0], W[:, -1]])
-    #
-    # # eigenvectors == spatial filters == projection matrix
-    # print(f'Spatial filter shape: {W.shape}')
-    #
-    # # project data onto spatial filters
-    # X1_csp = np.stack([np.dot(W, trial) for trial in X1])
-    # X2_csp = np.stack([np.dot(W, trial) for trial in X2])
-    #
-    # print(f'Data after spatial filtering shape: {X1_csp.shape}')
-    #
     return X1_csp, X2_csp
 
 def main():
