@@ -1,12 +1,12 @@
 '''
 Run a range of ML models on power data from Crown
 Tests a range of hyperparameters using nested cross validation
-Data extracted from JSON files (via crown_processing.py)
+Data extracted from JSON files (via crown_training_processing.py)
 '''
 
 import numpy as np
 import matplotlib.pyplot as plt
-import crown_processing
+import crown_training_processing
 from collections import Counter
 from abc import ABC, abstractmethod
 from sklearn.ensemble import RandomForestClassifier
@@ -31,14 +31,14 @@ class Processing:
     @staticmethod
     def extract_data():
         '''
-        Extract data from JSON and process through crown_processing.py
+        Extract data from JSON and process through crown_training_processing.py
         :return:
             X - data of shape (20_
             y - labels
             class_weighting - split between classes (returned as a list with length = num of classes)
         '''
 
-        L1, L2 = crown_processing.main()                # pull logvar data from processing file
+        L1, L2 = crown_training_processing.main()                # pull logvar data from processing file
 
         # x = features, y = classification labels (0 or 1)
         X = np.concatenate((L1, L2), axis=0)                                    # training data
