@@ -44,7 +44,7 @@ class Processing:
         X = np.concatenate((L1, L2), axis=0)                                    # training data
         y = np.concatenate((np.zeros(L1.shape[0]), np.ones(L2.shape[0])))              # create labels
 
-        print(X.shape)
+        print(f'Training data shape: {X.shape}')
 
         return X, y
 
