@@ -5,8 +5,9 @@ Stream EEG data and run realtime inference on trained model
 import asyncio
 from neurosity import NeurositySDK
 from dotenv import load_dotenv
-import json
+import numpy as np
 import os
+import crown_realtime_processing
 from datetime import datetime
 import time
 import random
@@ -52,17 +53,34 @@ def main():
     neurosity = initialise()
     stream = []
 
-    global iter, complete
+    global iter, complete, window
     iter = 0  # loop counter
     complete = False
-    iters = 16*10
+    iters = 16 * 10
+    window = []
 
-    # pull EEG data
+    # pull & process EEG data
     def callback(data):
-        global iter, complete
-        stream.append(data)
+        global iter, complete, window
         iter += 1
         print(f'iter: {iter}')
+
+        signals = np.array(data['data'])
+        for i in range(signals.shape[1]):
+            ## improve this code with dequeue (no for loop)
+            window.append(signals[:, i].tolist())
+
+        if iter > 32:
+            # if over 2 seconds of total data collected, create sliding window of last 2 seconds
+            # create sliding window
+            window = window[16:]
+            print(len(window))
+
+            # processing & model inference
+            crown_realtime_processing.main(window)
+
+
+
         if iter >= iters:
             complete = True
             unsubscribe()
