@@ -166,10 +166,12 @@ def spatial_filter(X1, X2):
     idx = np.argsort(D)[::-1]
     D = D[idx]
     W = U[:, idx]               # W == spatial filters
-    print(f'Discriminative eigenvalues {D}')
+    print(f'Discriminative eigenvalues: {D}')
 
     # transform spatial filters back into original space
     W = np.dot(P.T ,W)
+    # keep top eigenvectors
+    W = np.column_stack((W[:, :1], W[:, -1:]))
 
     # project spatial filters onto data
     X1_csp = np.stack([np.dot(W.T, trial) for trial in X1])
@@ -327,9 +329,9 @@ def main():
     L2 = logvar(X2)
 
     # plots
-    plot_psd(freqs, P1, P2)
-    bar_logvar(L1,L2)
-    scatter_logvar(L1,L2)
+    # plot_psd(freqs, P1, P2)
+    # bar_logvar(L1,L2)
+    # scatter_logvar(L1,L2)
 
     print(f'Input data shape: {L1.shape}')
 

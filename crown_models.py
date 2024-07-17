@@ -2,12 +2,8 @@
 Run a range of ML models on power data from Crown
 Tests a range of hyperparameters using nested cross validation
 Data extracted from JSON files (via crown_processing.py)
-
-CLASS 1 = raise right arm
-CLASS 2 = raise left arm
 '''
 
-import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import crown_processing
@@ -15,9 +11,7 @@ from collections import Counter
 from abc import ABC, abstractmethod
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
-from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, confusion_matrix
-from sklearn.impute import SimpleImputer
 from sklearn.covariance import LedoitWolf, OAS, ShrunkCovariance
 from sklearn.model_selection import train_test_split, GridSearchCV, KFold
 from sklearn.decomposition import PCA
@@ -39,16 +33,16 @@ class Processing:
         '''
         Extract data from JSON and process through crown_processing.py
         :return:
-            X - data
+            X - data of shape (20_
             y - labels
             class_weighting - split between classes (returned as a list with length = num of classes)
         '''
 
-        _,_,_,_,P1,P2 = crown_processing.main()                # pull data from processing file
+        L1, L2 = crown_processing.main()                # pull logvar data from processing file
 
         # x = features, y = classification labels (0 or 1)
-        X = np.concatenate((P1, P2), axis=0)                                    # training data
-        y = np.concatenate((np.zeros(P1.shape[0]), np.ones(P2.shape[0])))       # labels
+        X = np.concatenate((L1, L2), axis=0)                                    # training data
+        y = np.concatenate((np.zeros(L1.shape[0]), np.ones(L2.shape[0])))              # create labels
 
         print(X.shape)
 
@@ -444,8 +438,8 @@ class LinearDiscriminant(BaseModel):
         contour = plt.contourf(xx, yy, Z, cmap=plt.cm.coolwarm, alpha=0.8)  # plot probability gradient
         plt.colorbar(contour, label='Class 2 Probability')
 
-        plt.scatter(X_train_2d[y_train == 0, 0], X_train_2d[y_train == 0, 1], c='blue', edgecolor='k', label='Class 1')
-        plt.scatter(X_train_2d[y_train == 1, 0], X_train_2d[y_train == 1, 1], c='red', edgecolor='k', label='Class 2')
+        plt.scatter(X_train_2d[y_train == 0, 0], X_train_2d[y_train == 0, 1], c='red', edgecolor='k', label='Right')
+        plt.scatter(X_train_2d[y_train == 1, 0], X_train_2d[y_train == 1, 1], c='blue', edgecolor='k', label='Left')
         plt.xlabel('PCA Component 1')
         plt.ylabel('PCA Component 2')
         plt.legend()
