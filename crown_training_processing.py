@@ -177,7 +177,7 @@ def spatial_filter(X1, X2):
     X1_csp = np.stack([np.dot(W.T, trial) for trial in X1])
     X2_csp = np.stack([np.dot(W.T, trial) for trial in X2])
 
-    return X1_csp, X2_csp
+    return X1_csp, X2_csp, W
 
 def main():
     '''
@@ -318,7 +318,7 @@ def main():
     X2 = normalise(bpass_filter(X2, 8, 15, 256))
 
     # pass data through spatial filters using CSP
-    X1, X2 = spatial_filter(X1=X1, X2=X2)
+    X1, X2, W = spatial_filter(X1=X1, X2=X2)
 
     # get Power Spectral Densities from spatially filtered data
     freqs, P1 = compute_psd(X1)
@@ -335,8 +335,8 @@ def main():
 
     print(f'Input data shape: {L1.shape}')
 
-    # return log variance as input into models
-    return L1, L2
+    # return log variance and spatial filters as input into models
+    return L1, L2, W
 
 
 if __name__ == '__main__':

@@ -10,6 +10,7 @@ import numpy as np
 import scipy.linalg
 import os
 import matplotlib.pyplot as plt
+import joblib
 
 
 def plot_psd(freqs, P1, P2):
@@ -44,55 +45,6 @@ def plot_psd(freqs, P1, P2):
     plt.tight_layout()
     plt.show()
 
-def logvar(PSD):
-    '''
-    Inputs PSD, returns a single power value for the plot as the log variance of the PSD
-    :param PSD: shape (n_trials, n_channels, n_psd_points)
-    :return: log variance of shape (n_trials, n_channels)
-    '''
-
-    return np.log(np.var(PSD, axis=2))
-
-def bar_logvar(L1, L2):
-    '''
-    Plot logvar bar chart of all channels to compare variance of each channel
-    :param L1: shape (n_trials, n_channels)
-    '''
-
-    plt.figure(figsize=(8, 5))
-
-    x0 = np.arange(L1.shape[1])                     # x axis = number of channels
-    x1 = np.arange(L1.shape[1]) + 0.4
-
-    y0 = np.mean(L1, axis=0)                        # y axis = log variance averaged over trials
-    y1 = np.mean(L2, axis=0)
-
-    plt.bar(x0, y0, width=0.4, color='red', label='right')
-    plt.bar(x1, y1, width=0.4, color='blue', label='left')
-
-    plt.gca().yaxis.grid(True)
-    plt.title('log-var of each channel/component')
-    plt.xlabel('channels/components')
-    plt.ylabel('log-var')
-    plt.legend()
-
-    plt.show()
-
-    return
-
-def scatter_logvar(L1, L2):
-    '''
-    Plot logvar scatter data of channels of interest OR most disriminative eigenvectors (1 point = 1 trial)
-    :params L1,L2: shape (n_trials, n_channels)
-    '''
-
-    plt.figure(figsize=(8, 5))
-
-    plt.scatter(L1[:, 0], L1[:, -1], color='red', linewidth=1, label='right')
-    plt.scatter(L2[:, 0], L2[:, -1], color='blue', linewidth=1, label='left')
-    plt.legend()
-
-    plt.show()
 
 def bpass_filter(data, lowcut, highcut, fs, order=5):
 
@@ -182,13 +134,29 @@ def spatial_filter(X1, X2):
 
 def main(window):
 
-    # bandpass filter & normalise
+    # load saved model & spatial filters (move this to pre-recording in async file)
+    model_file = joblib.load('models/lda_2024-07-17 18:18:10.377098.joblib')
+    model = model_file['model']
+    W = model_file['spatial_filters']
+    print(W.shape)
+    print(W)
+
+    window = np.array(window)
+    print(window.shape)
+
+    # pass window through preprocessing steps
     window = normalise(bpass_filter(window, 8, 15, 256))
 
+    #### # MODEL EXPECTS SHAPE (1,2)
+
+    model_file = joblib.load('models/lda_2024-07-17 18/18/10.377098.joblib')
+    model = model_file['model']
+    W = model_file['spatial_filters']
+    print(W.shape)
+    print(W)
 
 
-    ## save and import model for inference, including saved spatial filters
-
+    #######
 
     # pass data through spatial filters using CSP
     X1, X2 = spatial_filter(X1=X1, X2=X2)

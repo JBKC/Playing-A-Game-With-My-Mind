@@ -41,7 +41,7 @@ class Processing:
             class_weighting - split between classes (returned as a list with length = num of classes)
         '''
 
-        L1, L2 = crown_training_processing.main()                # pull logvar data from processing file
+        L1, L2, W = crown_training_processing.main()                # pull logvar data from processing file
 
         # x = features, y = classification labels (0 or 1)
         X = np.concatenate((L1, L2), axis=0)                                    # training data
@@ -49,7 +49,7 @@ class Processing:
 
         print(f'Training data shape: {X.shape}')
 
-        return X, y
+        return X, y, W
 
     @staticmethod
     def frange(start, stop, step):
@@ -351,7 +351,7 @@ class Training:
 class BaseModel(ABC):
     # template for model classes
     def __init__(self):
-        self.X, self.y = Processing.extract_data()
+        self.X, self.y, self.W = Processing.extract_data()
         self.model_type = None      # specify which model will be run
 
     def run(self):
@@ -362,7 +362,7 @@ class BaseModel(ABC):
         X_train, y_train, X_test, y_test, model = Training.nested_cross_validation(self.X, self.y, self.model_type)
         self.plot(X_train, y_train, model)
 
-        return model
+        return model, self.W
 
     @abstractmethod
     def plot(self, X_train, y_train, model):
@@ -532,14 +532,15 @@ def main():
     # Look up and call the corresponding function
     if model_type in model_functions:
         model = model_functions[model_type]()
-        final_model = model.run()
+        final_model, W = model.run()
     else:
         print(f"Model type '{model_type}' is not supported.")
 
-    # save down model
+    # save down model & spatial filters W
     folder = 'models'
     os.makedirs(folder, exist_ok=True)
-    joblib.dump(final_model, f'{folder}/lda_{datetime.now()}.joblib')
+
+    joblib.dump({'spatial_filters': W, 'model': final_model}, f'{folder}/{model_type}_{datetime.now()}.joblib')
     print("Model saved successfully.")
 
     return

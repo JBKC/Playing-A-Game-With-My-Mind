@@ -70,11 +70,10 @@ def main():
             ## improve this code with dequeue (no for loop)
             window.append(signals[:, i].tolist())
 
+        # if over 2 seconds of total data collected, create sliding window of last 2 seconds
         if iter > 32:
-            # if over 2 seconds of total data collected, create sliding window of last 2 seconds
             # create sliding window
             window = window[16:]
-            print(len(window))
 
             # processing & model inference
             crown_realtime_processing.main(window)
