@@ -180,12 +180,15 @@ def spatial_filter(X1, X2):
 
     return X1_csp, X2_csp
 
-def main(signal):
+def main(window):
 
     # bandpass filter & normalise
-    signal = normalise(bpass_filter(signal, 8, 15, 256))
+    window = normalise(bpass_filter(window, 8, 15, 256))
+
+
 
     ## save and import model for inference, including saved spatial filters
+
 
     # pass data through spatial filters using CSP
     X1, X2 = spatial_filter(X1=X1, X2=X2)

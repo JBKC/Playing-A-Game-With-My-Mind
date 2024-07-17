@@ -9,6 +9,9 @@ import matplotlib.pyplot as plt
 import crown_training_processing
 from collections import Counter
 from abc import ABC, abstractmethod
+import joblib
+import os
+from datetime import datetime
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.svm import SVC
 from sklearn.metrics import classification_report, confusion_matrix
@@ -359,6 +362,8 @@ class BaseModel(ABC):
         X_train, y_train, X_test, y_test, model = Training.nested_cross_validation(self.X, self.y, self.model_type)
         self.plot(X_train, y_train, model)
 
+        return model
+
     @abstractmethod
     def plot(self, X_train, y_train, model):
         # plotting scatter mesh plot of training data with probability contours
@@ -435,7 +440,8 @@ class LinearDiscriminant(BaseModel):
         Z = model.predict_proba(pca.inverse_transform(np.c_[xx.ravel(), yy.ravel()]))[:, 1]
         Z = Z.reshape(xx.shape)
 
-        contour = plt.contourf(xx, yy, Z, cmap=plt.cm.coolwarm, alpha=0.8)  # plot probability gradient
+        coolwarm_r = plt.cm.coolwarm.reversed()
+        contour = plt.contourf(xx, yy, Z, cmap=plt.cm.coolwarm_r, alpha=0.8)  # plot probability gradient
         plt.colorbar(contour, label='Class 2 Probability')
 
         plt.scatter(X_train_2d[y_train == 0, 0], X_train_2d[y_train == 0, 1], c='red', edgecolor='k', label='Right')
@@ -526,9 +532,15 @@ def main():
     # Look up and call the corresponding function
     if model_type in model_functions:
         model = model_functions[model_type]()
-        model.run()
+        final_model = model.run()
     else:
         print(f"Model type '{model_type}' is not supported.")
+
+    # save down model
+    folder = 'models'
+    os.makedirs(folder, exist_ok=True)
+    joblib.dump(final_model, f'{folder}/lda_{datetime.now()}.joblib')
+    print("Model saved successfully.")
 
     return
 
