@@ -1,14 +1,12 @@
 '''
-Process realtime data sent in windows by async
+Classify realtime data sent in windows by async
 Takes in data of shape (512,8)
 '''
 
-import json
 import scipy.io
 from scipy.signal import butter, filtfilt
 import numpy as np
 import scipy.linalg
-import os
 import matplotlib.pyplot as plt
 import joblib
 
@@ -45,7 +43,6 @@ def plot_psd(freqs, P1, P2):
     plt.tight_layout()
     plt.show()
 
-
 def bpass_filter(data, lowcut, highcut, fs, order=5):
 
     # signal params
@@ -60,6 +57,15 @@ def normalise(signal):
     # zero mean the signal
     return signal - np.mean(signal)
 
+def logvar(PSD):
+    '''
+    Inputs PSD, returns a single power value for the plot as the log variance of the PSD
+    :param PSD: shape (n_trials, n_channels, n_psd_points)
+    :return: log variance of shape (n_trials, n_channels)
+    '''
+
+    return np.log(np.var(PSD, axis=2))
+
 def compute_psd(tensor):
     '''
     :param takes in 3D tensor of shape (n_trials, n_channels, n_samples)
@@ -72,113 +78,38 @@ def compute_psd(tensor):
 
     return np.array(freqs), np.array(PSD)
 
-def spatial_filter(X1, X2):
-
-    """
-    Compute CSP for two classes of EEG data.
-
-    X1, X2: Shape = (n_trials, n_channels, n_samples)
-    """
-
-    def cov(X):
-        '''
-        Take in 3D tensor X of shape (n_trials, n_channels, n_samples)
-        Calculates the covariance matrix of shape (n_channels, n_channels)
-        Normalise the covs by dividing by number of samples
-        Returns average of covs over all trials
-        '''
-        n_samples = X.shape[2]
-        covs = [np.dot(trial, trial.T) / n_samples for trial in X]
-
-        return np.mean(covs, axis=0)
-
-    def whitening_matrix(sigma):
-        # eigendecomposition of composite covariance matrix
-        D, U = np.linalg.eigh(sigma)
-
-        # use PCA whitening (without transformation back into original space)
-        return np.dot(np.diag(D ** -0.5), U.T)
-
-    # calculate covariance matrices
-    R1 = cov(X1)
-    R2 = cov(X2)
-    print(f'Covariance matrix  shape: {R1.shape}')                    # shape (n_channels, n_channels)
-
-    # get whitening matrix P from composite covariance matrix
-    P = whitening_matrix(R1 + R2)
-    print(f'Whitening matrix shape: {P.shape}')                       # shape (n_channels, n_channels)
-
-    # whiten covariance matrices
-    S1 = np.dot(np.dot(P, R1), P.T)
-    S2 = np.dot(np.dot(P, R2), P.T)
-
-    # solve generalised eigenvalue problem
-    D, U = scipy.linalg.eigh(S1, S1+S2)
-
-    # sort eigenvalues in descending order
-    idx = np.argsort(D)[::-1]
-    D = D[idx]
-    W = U[:, idx]               # W == spatial filters
-    print(f'Discriminative eigenvalues: {D}')
-
-    # transform spatial filters back into original space
-    W = np.dot(P.T ,W)
-    # keep top eigenvectors
-    W = np.column_stack((W[:, :1], W[:, -1:]))
-
-    # project spatial filters onto data
-    X1_csp = np.stack([np.dot(W.T, trial) for trial in X1])
-    X2_csp = np.stack([np.dot(W.T, trial) for trial in X2])
-
-    return X1_csp, X2_csp
-
 def main(window):
 
     # load saved model & spatial filters (move this to pre-recording in async file)
     model_file = joblib.load('models/lda_2024-07-17 18:18:10.377098.joblib')
     model = model_file['model']
     W = model_file['spatial_filters']
-    print(W.shape)
-    print(W)
 
-    window = np.array(window)
-    print(window.shape)
+    X = np.transpose(np.array(window), (1, 0))             # shape (n_channels, n_samples)
+    print(f'Input window shape: {X.shape}')
 
     # pass window through preprocessing steps
-    window = normalise(bpass_filter(window, 8, 15, 256))
+    # normalise + bandpass
+    X = normalise(bpass_filter(X, 8, 15, 256))
 
-    #### # MODEL EXPECTS SHAPE (1,2)
+    # apply spatial filters
+    X_csp = np.dot(W.T, X)
+    print(f'X_csp shape: {X_csp.shape}')            # should be (n_CSP_components, n_samples)
 
-    model_file = joblib.load('models/lda_2024-07-17 18/18/10.377098.joblib')
-    model = model_file['model']
-    W = model_file['spatial_filters']
-    print(W.shape)
-    print(W)
-
-
-    #######
-
-    # pass data through spatial filters using CSP
-    X1, X2 = spatial_filter(X1=X1, X2=X2)
-
-
-    # get Power Spectral Densities from spatially filtered data
-    freqs, P1 = compute_psd(X1)
-    _, P2 = compute_psd(X2)
+    # get Power Spectral Density (optional visualisation)
+    # freqs, P = compute_psd(X_csp)
+    # plot_psd(freqs, P)
 
     # get Log Variance
-    L1 = logvar(X1)
-    L2 = logvar(X2)
+    L = logvar(X_csp)
 
-    # plots
-    # plot_psd(freqs, P1, P2)
-    # bar_logvar(L1,L2)
-    # scatter_logvar(L1,L2)
+    print(f'Ineference shape: {L.shape}')          # should be (1, n_CSP_components)
 
-    print(f'Input data shape: {L1.shape}')
+    y_pred = model.predict(L)
 
-    # return log variance as input into models
-    return L1, L2
+    # print predicted class here
+
+    return
 
 
 if __name__ == '__main__':

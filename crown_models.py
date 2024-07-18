@@ -326,10 +326,10 @@ class Training:
         '''
         Run the selected model
         :param model: name of the model
-        :param X_train: array of training data
-        :param y_train: array of training classification labels
-        :param X_test: array of testing data
-        :param y_test: array of testing classification labels
+        :param X_train: array of training data, shape (n_trials, n_CSP_components)
+        :param y_train: array of training classification labels, shape (n_trials,)
+        :param X_test: array of testing data, shape  (n_trials, n_CSP_components)
+        :param y_test: array of testing classification labels, shape (n_trials,)
         :return accuracy_score(y_test, y_pred): model accuracy score
         '''
 
