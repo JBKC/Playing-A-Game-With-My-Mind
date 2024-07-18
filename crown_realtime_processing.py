@@ -11,9 +11,9 @@ import matplotlib.pyplot as plt
 import joblib
 
 
-def plot_psd(freqs, P1, P2):
+def plot_psd(freqs, P):
     '''
-    :params P1, P2: shape (n_trials, n_channels, n_samples/2 + 1)
+    :params: P (power) shape: (1, n_CSP_components, n_samples/2 + 1)
     '''
 
     channel_names = ['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6', 'C4', 'CP4']
@@ -22,23 +22,14 @@ def plot_psd(freqs, P1, P2):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 5))
 
     # plot the first and last eigenvectors (the most extreme discrimination)
-    ax1.plot(freqs, P1[:, 0, :].mean(axis=0), color='red', linewidth=1, label='right')
-    ax1.plot(freqs, P2[:, 0, :].mean(axis=0), color='blue', linewidth=1, label='left')
+    ax1.plot(freqs, P[:, 0, :].mean(axis=0), color='red', linewidth=1, label='first eigenvalue')
+    ax1.plot(freqs, P[:, -1, :].mean(axis=0), color='blue', linewidth=1, label='last eigenvalue')
     # ax1.set_title(f'PSD for {channel_names[1]} (controls right side)')
     ax1.set_xlabel('Frequency (Hz)')
     ax1.set_ylabel('Power Spectral Density')
     ax1.set_xlim(0, 30)
     ax1.set_ylim(0, 1)
     ax1.legend()
-
-    ax2.plot(freqs, P1[:, -1, :].mean(axis=0), color='red', linewidth=1, label='right')
-    ax2.plot(freqs, P2[:, -1, :].mean(axis=0), color='blue', linewidth=1, label='left')
-    # ax2.set_title(f'PSD for {channel_names[6]} (controls left side)')
-    ax2.set_xlabel('Frequency (Hz)')
-    ax2.set_ylabel('Power Spectral Density')
-    ax2.set_xlim(0, 30)
-    ax2.set_ylim(0, 1)
-    ax2.legend()
 
     plt.tight_layout()
     plt.show()
@@ -85,16 +76,19 @@ def main(window):
     model = model_file['model']
     W = model_file['spatial_filters']
 
-    X = np.transpose(np.array(window), (1, 0))             # shape (n_channels, n_samples)
+    print(f'Spatial Filters shape: {W.shape}')
+
+    X = np.transpose(np.array(window), (1, 0))             # shape (1, n_channels, n_samples)
+    X = np.expand_dims(X, axis=0)
     print(f'Input window shape: {X.shape}')
 
     # pass window through preprocessing steps
     # normalise + bandpass
     X = normalise(bpass_filter(X, 8, 15, 256))
 
-    # apply spatial filters
-    X_csp = np.dot(W.T, X)
-    print(f'X_csp shape: {X_csp.shape}')            # should be (n_CSP_components, n_samples)
+    # apply spatial filters to single trial
+    X_csp = np.stack([np.dot(W.T, trial) for trial in X])
+    print(f'X_csp shape: {X_csp.shape}')            # should be (1, n_CSP_components, n_samples)
 
     # get Power Spectral Density (optional visualisation)
     # freqs, P = compute_psd(X_csp)
@@ -103,11 +97,11 @@ def main(window):
     # get Log Variance
     L = logvar(X_csp)
 
-    print(f'Ineference shape: {L.shape}')          # should be (1, n_CSP_components)
+    print(f'Inference shape: {L.shape}')          # should be (1, n_CSP_components)
 
-    y_pred = model.predict(L)
-
-    # print predicted class here
+    # predict class probabilities
+    probs = model.predict_proba(L)
+    print(probs)
 
     return
 

@@ -74,7 +74,6 @@ def main():
         if iter > 32:
             # create sliding window
             window = window[16:]
-
             # processing & model inference - separate thread?
             crown_realtime_processing.main(window)
 
