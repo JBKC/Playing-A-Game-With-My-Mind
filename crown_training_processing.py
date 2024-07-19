@@ -39,8 +39,8 @@ def plot_psd(freqs, P1, P2, CSP=True):
         ax2.plot(freqs, P2[:, 6, :].mean(axis=0), color='blue', linewidth=1, label='left')
         ax1.set_title(f'PSD for {channel_names[1]} (controls right side)')
         ax2.set_title(f'PSD for {channel_names[6]} (controls left side)')
-        # ax1.set_ylim(0, 100)
-        # ax2.set_ylim(0, 100)
+        ax1.set_ylim(0, 50)
+        ax2.set_ylim(0, 50)
 
     ax1.set_xlabel('Frequency (Hz)')
     ax1.set_ylabel('Power Spectral Density')
@@ -329,7 +329,7 @@ def main():
 
         # match up class onsets with signal array
         window_length = 2
-        delay = 0.5
+        delay = 0
         X1_session = assign_trials(stream, onsets_1, window_length=window_length, delay=delay)               # X1 = right
         X2_session = assign_trials(stream, onsets_2, window_length=window_length, delay=delay)               # X2 = left
 
