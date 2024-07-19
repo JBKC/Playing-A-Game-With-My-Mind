@@ -428,30 +428,66 @@ class LinearDiscriminant(BaseModel):
         self.model_type = 'lda'
 
     def plot(self, X_train, y_train, model):
-        ## edit plot to plot the discriminative eigenvalues instead of PCA
+        # plots discriminative eigenvalues instead of PCA
 
-        pca = PCA(n_components=2)
-        X_train_2d = pca.fit_transform(X_train)
+        # Extract the first and last dimensions
+        X_train_2d = X_train[:, [0, -1]]  # Shape: (n_training_trials, 2)
 
         h = 0.02  # step size in the mesh
         x_min, x_max = X_train_2d[:, 0].min() - 1, X_train_2d[:, 0].max() + 1
         y_min, y_max = X_train_2d[:, 1].min() - 1, X_train_2d[:, 1].max() + 1
         xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
 
-        # predict the probability ranges for each class
-        Z = model.predict_proba(pca.inverse_transform(np.c_[xx.ravel(), yy.ravel()]))[:, 1]
+        # Create a mesh grid of the two selected features
+        mesh_2d = np.c_[xx.ravel(), yy.ravel()]
+
+        # Create a full 8D array for prediction by filling other dimensions with zeros
+        mesh_full = np.zeros((mesh_2d.shape[0], 8))
+        mesh_full[:, 0] = mesh_2d[:, 0]  # First feature
+        mesh_full[:, -1] = mesh_2d[:, 1]  # Last feature
+
+        # Predict probabilities
+        Z = model.predict_proba(mesh_full)[:, 1]
         Z = Z.reshape(xx.shape)
 
+        # plot
         coolwarm_r = plt.cm.coolwarm.reversed()
-        contour = plt.contourf(xx, yy, Z, cmap=plt.cm.coolwarm_r, alpha=0.8)  # plot probability gradient
+        contour = plt.contourf(xx, yy, Z, cmap=coolwarm_r, alpha=0.8)
         plt.colorbar(contour, label='Class 2 Probability')
 
         plt.scatter(X_train_2d[y_train == 0, 0], X_train_2d[y_train == 0, 1], c='red', edgecolor='k', label='Right')
         plt.scatter(X_train_2d[y_train == 1, 0], X_train_2d[y_train == 1, 1], c='blue', edgecolor='k', label='Left')
-        plt.xlabel('PCA Component 1')
-        plt.ylabel('PCA Component 2')
+        plt.xlabel('First Feature')
+        plt.ylabel('Last Feature')
         plt.legend()
         plt.show()
+
+    # # PCA VERSION
+    # def plot(self, X_train, y_train, model):
+    #
+
+    #     pca = PCA(n_components=2)
+    #     X_train_2d = pca.fit_transform(X_train)
+    #
+    #     h = 0.02  # step size in the mesh
+    #     x_min, x_max = X_train_2d[:, 0].min() - 1, X_train_2d[:, 0].max() + 1
+    #     y_min, y_max = X_train_2d[:, 1].min() - 1, X_train_2d[:, 1].max() + 1
+    #     xx, yy = np.meshgrid(np.arange(x_min, x_max, h), np.arange(y_min, y_max, h))
+    #
+    #     # predict the probability ranges for each class
+    #     Z = model.predict_proba(pca.inverse_transform(np.c_[xx.ravel(), yy.ravel()]))[:, 1]
+    #     Z = Z.reshape(xx.shape)
+    #
+    #     coolwarm_r = plt.cm.coolwarm.reversed()
+    #     contour = plt.contourf(xx, yy, Z, cmap=plt.cm.coolwarm_r, alpha=0.8)  # plot probability gradient
+    #     plt.colorbar(contour, label='Class 2 Probability')
+    #
+    #     plt.scatter(X_train_2d[y_train == 0, 0], X_train_2d[y_train == 0, 1], c='red', edgecolor='k', label='Right')
+    #     plt.scatter(X_train_2d[y_train == 1, 0], X_train_2d[y_train == 1, 1], c='blue', edgecolor='k', label='Left')
+    #     plt.xlabel('PCA Component 1')
+    #     plt.ylabel('PCA Component 2')
+    #     plt.legend()
+    #     plt.show()
 
 class GaussianNaiveBayes(BaseModel):
     def __init__(self):
