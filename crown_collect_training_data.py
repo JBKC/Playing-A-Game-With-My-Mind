@@ -160,7 +160,7 @@ def main():
                 pygame.quit()
                 return
 
-        clock.tick(60)  # limit to 60 FPS
+        clock.tick(10)  # limit to 10 FPS
 
     # finishing screen
     screen.fill((255, 255, 255))

@@ -56,7 +56,7 @@ def main():
     global iter, complete, window
     iter = 0  # loop counter
     complete = False
-    iters = 16 * 10
+    iters = 16 * 100
     window = []
 
     # pull & process EEG data
