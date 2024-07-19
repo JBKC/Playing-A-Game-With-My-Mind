@@ -72,7 +72,7 @@ def compute_psd(tensor):
 def main(window):
 
     # load saved model & spatial filters (move this to pre-recording in async file)
-    model_file = joblib.load('models/lda_2024-07-17 18:18:10.377098.joblib')
+    model_file = joblib.load('/Users/jamborghini/Documents/PYTHON/neurosity_multicontrol/models/lda_2024-07-19 16:41:45.482487.joblib')
     model = model_file['model']
     W = model_file['spatial_filters']
 

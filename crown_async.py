@@ -70,8 +70,8 @@ def main():
             ## improve this code with dequeue (no for loop)
             window.append(signals[:, i].tolist())
 
-        # if over 2 seconds of total data collected, create sliding window of last 2 seconds
-        if iter > 32:
+        # if over 1 second of total data collected, create sliding window of last 1 second
+        if iter > 16:
             # create sliding window
             window = window[16:]
             # processing & model inference - separate thread?

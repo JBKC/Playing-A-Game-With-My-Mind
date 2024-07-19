@@ -23,22 +23,22 @@ def plot_psd(freqs, P1, P2):
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 5))
 
     # plot the first and last eigenvectors (the most extreme discrimination)
-    ax1.plot(freqs, P1[:, 0, :].mean(axis=0), color='red', linewidth=1, label='right')
-    ax1.plot(freqs, P2[:, 0, :].mean(axis=0), color='blue', linewidth=1, label='left')
-    # ax1.set_title(f'PSD for {channel_names[1]} (controls right side)')
+    ax1.plot(freqs, P1[:, 1, :].mean(axis=0), color='red', linewidth=1, label='right')
+    ax1.plot(freqs, P2[:, 1, :].mean(axis=0), color='blue', linewidth=1, label='left')
+    ax1.set_title(f'PSD for {channel_names[1]} (controls right side)')
     ax1.set_xlabel('Frequency (Hz)')
     ax1.set_ylabel('Power Spectral Density')
     ax1.set_xlim(0, 30)
-    ax1.set_ylim(0, 0.5)
+    ax1.set_ylim(0, 100)
     ax1.legend()
 
-    ax2.plot(freqs, P1[:, -1, :].mean(axis=0), color='red', linewidth=1, label='right')
-    ax2.plot(freqs, P2[:, -1, :].mean(axis=0), color='blue', linewidth=1, label='left')
-    # ax2.set_title(f'PSD for {channel_names[6]} (controls left side)')
+    ax2.plot(freqs, P1[:, 6, :].mean(axis=0), color='red', linewidth=1, label='right')
+    ax2.plot(freqs, P2[:, 6, :].mean(axis=0), color='blue', linewidth=1, label='left')
+    ax2.set_title(f'PSD for {channel_names[6]} (controls left side)')
     ax2.set_xlabel('Frequency (Hz)')
     ax2.set_ylabel('Power Spectral Density')
     ax2.set_xlim(0, 30)
-    ax2.set_ylim(0, 0.5)
+    ax2.set_ylim(0, 100)
     ax2.legend()
 
     plt.tight_layout()
@@ -249,29 +249,24 @@ def main():
 
             return stream
 
-    def assign_trials(stream, onsets, full_window=True):
+    def assign_trials(stream, onsets, window_length):
         '''
         Slice up and append trials using timestamps from label data
         :params:
             stream: 2D array of session
             onsets: list of class onset timestamps
+            window_length: time in seconds of the period to take after the onset
             full_window: flag to choose whether to take full 4s period after onset or 0.5-2.5s period post-onset
         :return: 3D tensor of shape (n_trials, n_channels, n_samples)
         '''
 
-        if full_window:
-            window = 1024                           # = prompt length (4 seconds) * fs (256 Hz)
-            delay = 0
-        if not full_window:
-            window = 640
-            delay = int(256/0.5)
-
+        window = window_length * 256
         times = stream[:,0]
         time_idx = []                               # list of signal times that lie within a trial window
 
         # iterate through onset times
         for trial in onsets:
-            start_idx = np.where(times >= trial)[0][0] + delay                # get index of start of trial in signal
+            start_idx = np.where(times >= trial)[0][0]                        # get index of start of trial in signal
             end_idx = min(start_idx + window, len(times))                     # end index of trial in signal
             time_idx.append(np.arange(start_idx,end_idx))                     # range of trial indices
 
@@ -322,8 +317,8 @@ def main():
         # print(f'Number of class 2 trials: {len(onsets_2)}')
 
         # match up class onsets with signal array
-        X1_session = assign_trials(stream, onsets_1, full_window=False)                                # X1 = right
-        X2_session = assign_trials(stream, onsets_2, full_window=False)                                # X2 = left
+        X1_session = assign_trials(stream, onsets_1, window_length=2)                                # X1 = right
+        X2_session = assign_trials(stream, onsets_2, window_length=2)                                # X2 = left
 
         # Concatenate the session data
         if X1 is None:
@@ -338,25 +333,35 @@ def main():
 
     print(f'Each class tensor shape: {X1.shape}')
 
+    # X1 = normalise(X1)
+    # X2 = normalise(X2)
+
+    # raw power plot
+    freqs_raw, P1_raw = compute_psd(X1)
+    _, P2_raw = compute_psd(X2)
+    plot_psd(freqs_raw, P1_raw, P2_raw)
+
+
     # bandpass filter & normalise
-    X1 = normalise(bpass_filter(X1, 8, 15, 256))
-    X2 = normalise(bpass_filter(X2, 8, 15, 256))
-
-    # pass data through spatial filters using CSP
-    X1, X2, W = spatial_filter(X1=X1, X2=X2)
-
-    # get Power Spectral Densities from spatially filtered data
-    freqs, P1 = compute_psd(X1)
-    _, P2 = compute_psd(X2)
-
-    # get Log Variance
-    L1 = logvar(X1)
-    L2 = logvar(X2)
-
-    # plots
+    # X1_filt = normalise(bpass_filter(X1, 8, 15, 256))
+    # X2_filt = normalise(bpass_filter(X2, 8, 15, 256))
+    #
+    # # pass data through spatial filters using CSP
+    # X1_csp, X2_csp, W = spatial_filter(X1=X1_filt, X2=X2_filt)
+    #
+    # # get Power Spectral Densities from spatially filtered data
+    # freqs, P1 = compute_psd(X1_csp)
+    # _, P2 = compute_psd(X2_csp)
+    #
+    # # get Log Variance
+    # L1 = logvar(X1_csp)
+    # L2 = logvar(X2_csp)
+    #
+    # ## plots
     # plot_psd(freqs, P1, P2)
     # bar_logvar(L1,L2)
     # scatter_logvar(L1,L2)
+
 
     print(f'Each class model input shape: {L1.shape}')
 
