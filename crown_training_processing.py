@@ -105,8 +105,8 @@ def bpass_filter(data, lowcut, highcut, fs, order=5):
     return filtfilt(b, a, data, axis=2)
 
 def normalise(signal):
-    # zero mean the signal
-    return signal - np.mean(signal)
+    # Z-score normalisation
+    return (signal - np.mean(signal)) / np.std(signal)
 
 def compute_psd(tensor):
     '''
@@ -171,7 +171,7 @@ def spatial_filter(X1, X2):
     # transform spatial filters back into original space
     W = np.dot(P.T ,W)
     # keep top eigenvectors
-    W = np.column_stack((W[:, :1], W[:, -1:]))
+    # W = np.column_stack((W[:, :1], W[:, -1:]))
 
     # project spatial filters onto data
     X1_csp = np.stack([np.dot(W.T, trial) for trial in X1])
