@@ -29,7 +29,7 @@ def plot_psd(freqs, P1, P2):
     ax1.set_xlabel('Frequency (Hz)')
     ax1.set_ylabel('Power Spectral Density')
     ax1.set_xlim(0, 30)
-    ax1.set_ylim(0, 1)
+    ax1.set_ylim(0, 0.5)
     ax1.legend()
 
     ax2.plot(freqs, P1[:, -1, :].mean(axis=0), color='red', linewidth=1, label='right')
@@ -38,7 +38,7 @@ def plot_psd(freqs, P1, P2):
     ax2.set_xlabel('Frequency (Hz)')
     ax2.set_ylabel('Power Spectral Density')
     ax2.set_xlim(0, 30)
-    ax2.set_ylim(0, 1)
+    ax2.set_ylim(0, 0.5)
     ax2.legend()
 
     plt.tight_layout()
@@ -71,8 +71,8 @@ def bar_logvar(L1, L2):
     plt.bar(x1, y1, width=0.4, color='blue', label='left')
 
     plt.gca().yaxis.grid(True)
-    plt.title('log-var of each channel/component')
-    plt.xlabel('channels/components')
+    plt.title('log-var of each CSP component')
+    plt.xlabel('CSP components')
     plt.ylabel('log-var')
     plt.legend()
 
@@ -219,21 +219,22 @@ def main():
 
         return stream
 
-    def get_data():
+    def get_data(session):
         '''
         Extracts, reformats and preprocesses raw signal data from JSON file
         Contains list of dictionaries of length n_iterations (1 iteration = 16 datapoints for each of 8 channels)
+        :param: session: directory of eeg_stream json file
         :return: 2D array of shape (n_samples, (time channel + n_EEG_channels))
         '''
 
-        with open(os.path.join(folder, session), 'r') as f:
+        with open(session, 'r') as f:
             data = json.load(f)
 
             stream = []                 # array for individual streams to be appended to. of shape (n_channels, n_total_samples)
 
             # pull individual dictionaries (datapackets)
             for packet in data:
-                channels = packet['info']['channelNames']
+                # channels = packet['info']['channelNames']
                 signals = np.array(packet['data'])
                 time = packet['info']['startTime'] / 1000      # convert to seconds to match label data
 
@@ -282,36 +283,60 @@ def main():
         return np.transpose(tensor, (0, 2, 1))
 
     ##########################################
-    # pull saved files
-    folder = "test data"
-    for session in os.listdir(folder):
+    # create list of session tensors
+    X1 = None                     # class 1
+    X2 = None                     # class 2
 
-        # pull continuous signal data
-        if 'eeg_stream' in session:
-            # extract list of dictionaries (datapackets) into one dataframe
-            stream = get_data()
+    # pull saved files from distinct folders each containing a single session
+    root = "training_data"
 
-            print(f'All data shape: {stream.shape}')
+    for folder in os.listdir(root):
+        if folder == ".DS_Store":
+            continue  # Skip .DS_Store files
 
-        # pull trial labels
-        if 'labels' in session:
-            with open(os.path.join(folder, session), 'r') as f:
-                data = json.load(f)
-                # pair onsets with class label
-                labels = [(i[0], i[-1]) for i in data]
+        folder_path = os.path.join(root, folder)
 
-            # get class onsets
-            onsets_1 = [(i[0]) for i in labels if i[-1] == -1]      # right data
-            onsets_2 = [(i[0]) for i in labels if i[-1] == 1]       # left data
+        for session_path in os.listdir(folder_path):
+            session = os.path.join(folder_path, session_path)
 
-    print(f'Number of class 1 trials: {len(onsets_1)}')
-    print(f'Number of class 2 trials: {len(onsets_2)}')
+            # pull continuous signal data
+            if 'eeg_stream' in session:
+                # extract list of dictionaries (datapackets) into one array
+                stream = get_data(session)
 
-    # match up class onsets with signal data in DataFrame
-    X1 = assign_trials(stream, onsets_1, full_window=False)                                # X1 = right
-    X2 = assign_trials(stream, onsets_2, full_window=False)                                # X2 = left
+                # print(f'Single class data shape: {stream.shape}')
 
-    print(f'Signal tensor shape: {X1.shape}')
+            # pull trial labels
+            if 'labels' in session:
+                with open(session, 'r') as f:
+                    data = json.load(f)
+
+                    # pair onsets with class label
+                    labels = [(i[0], i[-1]) for i in data]
+
+                # get class onsets
+                onsets_1 = [(i[0]) for i in labels if i[-1] == -1]      # right data
+                onsets_2 = [(i[0]) for i in labels if i[-1] == 1]       # left data
+
+        # print(f'Number of class 1 trials: {len(onsets_1)}')
+        # print(f'Number of class 2 trials: {len(onsets_2)}')
+
+        # match up class onsets with signal array
+        X1_session = assign_trials(stream, onsets_1, full_window=False)                                # X1 = right
+        X2_session = assign_trials(stream, onsets_2, full_window=False)                                # X2 = left
+
+        # Concatenate the session data
+        if X1 is None:
+            X1 = X1_session
+        else:
+            X1 = np.concatenate((X1, X1_session), axis=0)
+
+        if X2 is None:
+            X2 = X2_session
+        else:
+            X2 = np.concatenate((X2, X2_session), axis=0)
+
+    print(f'Each class tensor shape: {X1.shape}')
 
     # bandpass filter & normalise
     X1 = normalise(bpass_filter(X1, 8, 15, 256))
@@ -333,7 +358,7 @@ def main():
     # bar_logvar(L1,L2)
     # scatter_logvar(L1,L2)
 
-    print(f'Input data shape: {L1.shape}')
+    print(f'Each class model input shape: {L1.shape}')
 
     # return log variance and spatial filters as input into models
     return L1, L2, W

@@ -175,7 +175,7 @@ def main():
 
     def save_json():
         # save EEG stream + prompt timestamps
-        folder = f'test data'
+        folder = f'training_data'
         os.makedirs(folder, exist_ok=True)
 
         eeg_stream = [item.to_dict() if hasattr(item, 'to_dict') else item for item in stream]
