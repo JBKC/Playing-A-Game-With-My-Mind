@@ -16,15 +16,12 @@ def plot_psd(freqs, P):
     :params: P (power) shape: (1, n_CSP_components, n_samples/2 + 1)
     '''
 
-    channel_names = ['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6', 'C4', 'CP4']
-
     # Create subplots
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 5))
 
     # plot the first and last eigenvectors (the most extreme discrimination)
     ax1.plot(freqs, P[:, 0, :].mean(axis=0), color='red', linewidth=1, label='first eigenvalue')
     ax1.plot(freqs, P[:, -1, :].mean(axis=0), color='blue', linewidth=1, label='last eigenvalue')
-    # ax1.set_title(f'PSD for {channel_names[1]} (controls right side)')
     ax1.set_xlabel('Frequency (Hz)')
     ax1.set_ylabel('Power Spectral Density')
     ax1.set_xlim(0, 30)
@@ -69,12 +66,7 @@ def compute_psd(tensor):
 
     return np.array(freqs), np.array(PSD)
 
-def main(window):
-
-    # load saved model & spatial filters (move this to pre-recording in async file)
-    model_file = joblib.load('/Users/jamborghini/Documents/PYTHON/neurosity_multicontrol/models/lda_2024-07-19 22:37:28.677998.joblib')
-    model = model_file['model']
-    W = model_file['spatial_filters']
+def main(window, model, W):
 
     print(f'Spatial Filters shape: {W.shape}')
 
@@ -97,10 +89,10 @@ def main(window):
     # get Log Variance
     L = logvar(X_csp)
 
-    print(f'Inference shape: {L.shape}')          # should be (1, n_CSP_components)
+    # print(f'Inference shape: {L.shape}')          # should be (1, n_CSP_components)
 
     # predict class probabilities
-    probs = model.predict_proba(L)
+    probs = model.predict_proba(L)[0]
     print(probs)
 
     return

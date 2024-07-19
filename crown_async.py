@@ -8,6 +8,7 @@ from dotenv import load_dotenv
 import numpy as np
 import os
 import crown_realtime_processing
+import joblib
 from datetime import datetime
 import time
 import random
@@ -56,8 +57,14 @@ def main():
     global iter, complete, window
     iter = 0  # loop counter
     complete = False
-    iters = 16 * 100
+    iters = 100                 # how many seconds of data to collect
     window = []
+
+    # load saved model & spatial filters
+    model_file = joblib.load(
+        '/Users/jamborghini/Documents/PYTHON/neurosity_multicontrol/models/lda_2024-07-19 22:37:28.677998.joblib')
+    model = model_file['model']
+    W = model_file['spatial_filters']
 
     # pull & process EEG data
     def callback(data):
@@ -74,11 +81,11 @@ def main():
         if iter > 32:
             # create sliding window
             window = window[16:]
-            print(len(window))
             # processing & model inference - separate thread?
-            crown_realtime_processing.main(window)
+            crown_realtime_processing.main(window, model, W)
 
-        if iter >= iters:
+        if iter >= 16 * iters:
+            time.sleep(10)
             complete = True
             unsubscribe()
 
