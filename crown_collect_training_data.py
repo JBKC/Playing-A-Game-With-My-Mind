@@ -68,7 +68,7 @@ def main():
 
     # training parameters
     tasks = {
-        "action": ["Right hand - imagine picking up a mug", "Left hand - imagine picking up a mug"],
+        "action": ["Right arm - imagine curling a dumbbell", "Left arm - imagine curling a dumbbell"],
         "label": [-1, 1],
         "relax": "Relax"
     }

@@ -39,8 +39,8 @@ def plot_psd(freqs, P1, P2, CSP=True):
         ax2.plot(freqs, P2[:, 6, :].mean(axis=0), color='blue', linewidth=1, label='left')
         ax1.set_title(f'PSD for {channel_names[1]} (controls right side)')
         ax2.set_title(f'PSD for {channel_names[6]} (controls left side)')
-        ax1.set_ylim(0, 100)
-        ax2.set_ylim(0, 100)
+        # ax1.set_ylim(0, 100)
+        # ax2.set_ylim(0, 100)
 
     ax1.set_xlabel('Frequency (Hz)')
     ax1.set_ylabel('Power Spectral Density')
@@ -362,12 +362,12 @@ def main():
     L2 = logvar(X2_csp)
 
     ## plots
-    # freqs_raw, P1_raw = compute_psd(X1)
-    # _, P2_raw = compute_psd(X2)
-    # plot_psd(freqs_raw, P1_raw, P2_raw, CSP=False)
-    # plot_psd(freqs, P1, P2, CSP=True)
-    # bar_logvar(L1,L2)
-    # scatter_logvar(L1,L2)
+    freqs_raw, P1_raw = compute_psd(X1)
+    _, P2_raw = compute_psd(X2)
+    plot_psd(freqs_raw, P1_raw, P2_raw, CSP=False)
+    plot_psd(freqs, P1, P2, CSP=True)
+    bar_logvar(L1,L2)
+    scatter_logvar(L1,L2)
 
 
     print(f'Each class model input shape: {L1.shape}')
