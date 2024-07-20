@@ -368,17 +368,31 @@ def main():
 
     #debugging rogue trials
 
-    # get mean standard deviation of raw signal over all trials to spot artifacts
+    plt.plot(X1[4,1,:])
+    plt.show()
+
+    # get mean standard deviation of raw signal over all trials for given channel
     mean_std = np.mean([np.std(X1[trial,1,:]) for trial in range(X1.shape[0])])
     print(mean_std)
 
-    # threshold the trials
+    # identify trials with artifacts
     for trial in range(X1.shape[0]):
-        if np.std(X1[trial,1,:]) > 2*mean_std:
+        trial_data = X1[trial,1,:]
+
+        mean = np.mean(trial_data)
+        std = np.std(trial_data)
+
+        if np.std(trial_data) > 2 * mean_std:
             print(trial)
+            print(mean)
+            print(std)
+            mask = np.abs(trial_data - mean) > std
+            print(mask)
+            x = np.arange(X1.shape[-1])
+            f = scipy.interpolate.interp1d(x[~mask], trial_data[~mask], kind='linear', fill_value="extrapolate")
+            X1[trial, 1, mask] = f(x[mask])
 
-
-    plt.plot(X1[0,1,:])
+    plt.plot(X1[4,1,:])
     plt.show()
 
     plot_psd(freqs_raw, P1_raw, P2_raw, CSP=False)
