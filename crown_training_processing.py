@@ -363,12 +363,10 @@ def main():
     L2 = logvar(X2_csp)
 
     ## plots
-    freqs_raw, P1_raw = compute_psd(X1)
-    _, P2_raw = compute_psd(X2)
+    plt.plot(X1[6,1,:])
 
     #debugging rogue trials
 
-    plt.plot(X1[4,1,:])
     plt.show()
 
     # get mean standard deviation of raw signal over all trials for given channel
@@ -384,16 +382,55 @@ def main():
 
         if np.std(trial_data) > 2 * mean_std:
             print(trial)
-            print(mean)
-            print(std)
+            print(f'Mean:{mean}')
+            print(f'Stdev:{std}')
             mask = np.abs(trial_data - mean) > std
-            print(mask)
-            x = np.arange(X1.shape[-1])
-            f = scipy.interpolate.interp1d(x[~mask], trial_data[~mask], kind='linear', fill_value="extrapolate")
-            X1[trial, 1, mask] = f(x[mask])
 
-    plt.plot(X1[4,1,:])
+            # segment masked areas
+            mask_idx = np.where(mask)[0]
+            # print(mask_idx)
+
+            start = [np.where(mask)[0][0]]                # starting point of each masked segment
+            end = []                                      # ending point of each masked segment
+
+            # get start and end indices of each masked segment
+            for i, idx in enumerate(mask_idx[:-1]):
+                if mask_idx[i+1] - idx > 1:
+                    start.append(mask_idx[i+1])
+                    end.append(idx)
+            end.append(np.where(mask)[0][-1])
+
+            # arrays of mask indices
+            masks = [np.arange(start[i], end[i]+1) for i in range(len(start))]
+            print(start,end)
+            print(masks)
+
+            # get mean of non-masked area
+
+
+            # apply lines to masked areas
+            for i, slope in enumerate(slopes):
+
+                print(masks[i])
+                print(slope)
+                X1[trial,1,masks[i]] = mean
+
+
+            # y = outcome
+            # m = slope
+            # x = indices in the masks range
+            # c = intercept
+
+            # Replace artifact points with the straight line values
+            # for i in range(first_non_artifact, last_non_artifact + 1):
+            #     if mask[i]:
+            #         X1[trial,1,:] = slope * i + intercept
+
+    plt.plot(X1[6,1,:])
     plt.show()
+
+    freqs_raw, P1_raw = compute_psd(X1)
+    _, P2_raw = compute_psd(X2)
 
     plot_psd(freqs_raw, P1_raw, P2_raw, CSP=False)
     plot_psd(freqs, P1, P2, CSP=True)
