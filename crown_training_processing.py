@@ -11,6 +11,7 @@ import scipy.linalg
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+import crown_artifacts
 from scipy import interpolate
 
 def plot_psd(freqs, P1, P2, CSP=True):
@@ -289,6 +290,38 @@ def main():
         # output tensor is shape (n_trials, n_channels, n_samples)
         return np.transpose(tensor, (0, 2, 1))
 
+    def artifacts(X, method='discard'):
+        '''
+        2 ways of dealing with artifacts (in the form of big spikes) -
+        discard the whole signal or correct for them
+        :params: X = 3D tensor of shape (n_trials, n_channels, n_samples)
+        :return: 3D tensor of shape (n_trials, n_channels, n_samples)
+        '''
+
+        artifact_trials = []
+
+        # get standard deviation of each trial and mean stdev over all trials in each channel
+        for channel in range(X.shape[1]):
+            trial_stds = np.std(X[:, channel, :], axis=1)
+            mean_std = np.mean(trial_stds)
+
+            print(f'channel: {channel}; mean std: {mean_std}; trial stds: {trial_stds}')
+
+            for i, std in enumerate(trial_stds):
+                # set criteria for detecting artifacts
+                if (std > 2 * mean_std) and (mean_std > 100):
+                    artifact_trials.append(i)           # save index of trial
+
+        if method=='discard':
+            # remove all trials with artifacts
+            X = X[[i for i in range(X.shape[0]) if i not in artifact_trials]]
+
+        if method=='correct':
+            # incomplete option
+            crown_artifacts.main()
+
+        return X
+
     ##########################################
     # create list of session tensors
     X1 = None                     # class 1
@@ -345,7 +378,13 @@ def main():
         else:
             X2 = np.concatenate((X2, X2_session), axis=0)
 
-    print(f'Each class tensor shape: {X1.shape}')
+
+    ## deal with artifacts
+    X1 = artifacts(X1, method='discard')
+    X2 = artifacts(X2, method='discard')
+
+    print(f'Class 1 trials: {X1.shape[0]}')
+    print(f'Class 2 trials: {X2.shape[0]}')
 
     # bandpass filter & normalise
     X1_filt = normalise(bpass_filter(X1, 8, 15, 256))
@@ -362,73 +401,6 @@ def main():
     L1 = logvar(X1_csp)
     L2 = logvar(X2_csp)
 
-    ## plots
-    plt.plot(X1[6,1,:])
-
-    #debugging rogue trials
-
-    plt.show()
-
-    # get mean standard deviation of raw signal over all trials for given channel
-    mean_std = np.mean([np.std(X1[trial,1,:]) for trial in range(X1.shape[0])])
-    print(mean_std)
-
-    # identify trials with artifacts
-    for trial in range(X1.shape[0]):
-        trial_data = X1[trial,1,:]
-
-        mean = np.mean(trial_data)
-        std = np.std(trial_data)
-
-        if np.std(trial_data) > 2 * mean_std:
-            print(trial)
-            print(f'Mean:{mean}')
-            print(f'Stdev:{std}')
-            mask = np.abs(trial_data - mean) > std
-
-            # segment masked areas
-            mask_idx = np.where(mask)[0]
-            # print(mask_idx)
-
-            start = [np.where(mask)[0][0]]                # starting point of each masked segment
-            end = []                                      # ending point of each masked segment
-
-            # get start and end indices of each masked segment
-            for i, idx in enumerate(mask_idx[:-1]):
-                if mask_idx[i+1] - idx > 1:
-                    start.append(mask_idx[i+1])
-                    end.append(idx)
-            end.append(np.where(mask)[0][-1])
-
-            # arrays of mask indices
-            masks = [np.arange(start[i], end[i]+1) for i in range(len(start))]
-            print(start,end)
-            print(masks)
-
-            # get mean of non-masked area
-
-
-            # apply lines to masked areas
-            for i, slope in enumerate(slopes):
-
-                print(masks[i])
-                print(slope)
-                X1[trial,1,masks[i]] = mean
-
-
-            # y = outcome
-            # m = slope
-            # x = indices in the masks range
-            # c = intercept
-
-            # Replace artifact points with the straight line values
-            # for i in range(first_non_artifact, last_non_artifact + 1):
-            #     if mask[i]:
-            #         X1[trial,1,:] = slope * i + intercept
-
-    plt.plot(X1[6,1,:])
-    plt.show()
-
     freqs_raw, P1_raw = compute_psd(X1)
     _, P2_raw = compute_psd(X2)
 
@@ -437,8 +409,9 @@ def main():
     bar_logvar(L1,L2)
     scatter_logvar(L1,L2)
 
+    print(f'Class 1 model input shape: {L1.shape}')
+    print(f'Class 2 model input shape: {L2.shape}')
 
-    print(f'Each class model input shape: {L1.shape}')
 
     # return log variance and spatial filters as input into models
     return L1, L2, W
