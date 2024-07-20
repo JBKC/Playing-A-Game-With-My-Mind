@@ -11,6 +11,7 @@ import scipy.linalg
 import os
 import pandas as pd
 import matplotlib.pyplot as plt
+from scipy import interpolate
 
 def plot_psd(freqs, P1, P2, CSP=True):
     '''
@@ -365,12 +366,19 @@ def main():
     freqs_raw, P1_raw = compute_psd(X1)
     _, P2_raw = compute_psd(X2)
 
-    #debugging rouge trials
-    for i in range(X1.shape[0]):
-        print(f'Trial no {i}: {np.max(X1[i,1,:])-np.min(X1[i,1,:])}')
+    #debugging rogue trials
+
+    # get mean standard deviation of raw signal over all trials to spot artifacts
+    mean_std = np.mean([np.std(X1[trial,1,:]) for trial in range(X1.shape[0])])
+    print(mean_std)
+
+    # threshold the trials
+    for trial in range(X1.shape[0]):
+        if np.std(X1[trial,1,:]) > 2*mean_std:
+            print(trial)
 
 
-    plt.plot(X1[4,1,:])
+    plt.plot(X1[0,1,:])
     plt.show()
 
     plot_psd(freqs_raw, P1_raw, P2_raw, CSP=False)
