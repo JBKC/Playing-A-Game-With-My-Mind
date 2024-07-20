@@ -305,7 +305,7 @@ def main():
             trial_stds = np.std(X[:, channel, :], axis=1)
             mean_std = np.mean(trial_stds)
 
-            print(f'channel: {channel}; mean std: {mean_std}; trial stds: {trial_stds}')
+            # print(f'channel: {channel}; mean std: {mean_std}; trial stds: {trial_stds}')
 
             for i, std in enumerate(trial_stds):
                 # set criteria for detecting artifacts
@@ -314,6 +314,7 @@ def main():
 
         if method=='discard':
             # remove all trials with artifacts
+            print(f'Trials removed: {artifact_trials}')
             X = X[[i for i in range(X.shape[0]) if i not in artifact_trials]]
 
         if method=='correct':
@@ -338,6 +339,7 @@ def main():
 
         for session_path in os.listdir(folder_path):
             session = os.path.join(folder_path, session_path)
+            print(session)
 
             # pull continuous signal data
             if 'eeg_stream' in session:
@@ -367,6 +369,10 @@ def main():
         X1_session = assign_trials(stream, onsets_1, window_length=window_length, delay=delay)               # X1 = right
         X2_session = assign_trials(stream, onsets_2, window_length=window_length, delay=delay)               # X2 = left
 
+        ## handle artifacts
+        X1_session = artifacts(X1_session, method='discard')
+        X2_session = artifacts(X2_session, method='discard')
+
         # Concatenate the session data
         if X1 is None:
             X1 = X1_session
@@ -378,17 +384,12 @@ def main():
         else:
             X2 = np.concatenate((X2, X2_session), axis=0)
 
-
-    ## deal with artifacts
-    X1 = artifacts(X1, method='discard')
-    X2 = artifacts(X2, method='discard')
-
     print(f'Class 1 trials: {X1.shape[0]}')
     print(f'Class 2 trials: {X2.shape[0]}')
 
     # bandpass filter & normalise
-    X1_filt = normalise(bpass_filter(X1, 8, 15, 256))
-    X2_filt = normalise(bpass_filter(X2, 8, 15, 256))
+    X1_filt = normalise(bpass_filter(X1, 5, 15, 256))
+    X2_filt = normalise(bpass_filter(X2, 5, 15, 256))
 
     # pass data through spatial filters using CSP
     X1_csp, X2_csp, W = spatial_filter(X1=X1_filt, X2=X2_filt)
