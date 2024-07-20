@@ -364,6 +364,15 @@ def main():
     ## plots
     freqs_raw, P1_raw = compute_psd(X1)
     _, P2_raw = compute_psd(X2)
+
+    #debugging rouge trials
+    for i in range(X1.shape[0]):
+        print(f'Trial no {i}: {np.max(X1[i,1,:])-np.min(X1[i,1,:])}')
+
+
+    plt.plot(X1[4,1,:])
+    plt.show()
+
     plot_psd(freqs_raw, P1_raw, P2_raw, CSP=False)
     plot_psd(freqs, P1, P2, CSP=True)
     bar_logvar(L1,L2)
