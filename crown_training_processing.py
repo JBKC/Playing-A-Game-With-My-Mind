@@ -298,6 +298,7 @@ def main():
         :return: 3D tensor of shape (n_trials, n_channels, n_samples)
         '''
 
+
         artifact_trials = []
 
         # get standard deviation of each trial and mean stdev over all trials in each channel
@@ -305,16 +306,16 @@ def main():
             trial_stds = np.std(X[:, channel, :], axis=1)
             mean_std = np.mean(trial_stds)
 
-            # print(f'channel: {channel}; mean std: {mean_std}; trial stds: {trial_stds}')
+            print(f'channel: {channel}; mean std: {mean_std}; trial stds: {trial_stds}')
 
             for i, std in enumerate(trial_stds):
                 # set criteria for detecting artifacts
-                if (std > 2 * mean_std) and (mean_std > 100):
+                if (std > 2 * mean_std) and (std > 100):
                     artifact_trials.append(i)           # save index of trial
+                    print(f'Trials removed: {artifact_trials}')
 
         if method=='discard':
             # remove all trials with artifacts
-            print(f'Trials removed: {artifact_trials}')
             X = X[[i for i in range(X.shape[0]) if i not in artifact_trials]]
 
         if method=='correct':
@@ -388,8 +389,8 @@ def main():
     print(f'Class 2 trials: {X2.shape[0]}')
 
     # bandpass filter & normalise
-    X1_filt = normalise(bpass_filter(X1, 5, 15, 256))
-    X2_filt = normalise(bpass_filter(X2, 5, 15, 256))
+    X1_filt = normalise(bpass_filter(X1, 8, 15, 256))
+    X2_filt = normalise(bpass_filter(X2, 8, 15, 256))
 
     # pass data through spatial filters using CSP
     X1_csp, X2_csp, W = spatial_filter(X1=X1_filt, X2=X2_filt)
