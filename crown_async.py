@@ -9,15 +9,13 @@ import numpy as np
 import os
 import crown_realtime_processing
 import joblib
-from datetime import datetime
 import time
-import random
-import threading
+
 
 # Load environment variables
 load_dotenv()
 
-def initialise():
+async def initialise():
     '''
     Initialise Crown for receiving data
     :return: neurosity: instance of NeurositySDK
@@ -48,54 +46,66 @@ def initialise():
 
 ################################
 
-# 16*16 data per second
+# task 1: pull EEG data
+async def eeg_stream(data_queue, neurosity):
+    # create callback that continuously extracts signals
+    async def callback(data):
+        signals = np.array(data['data'])
+        # pause signal extraction until coroutine completes
+        await data_queue.put(signals)
 
-def main():
-    neurosity = initialise()
-    stream = []
+    unsubscribe = await neurosity.brainwaves_raw_unfiltered(callback)
+    try:
+        while True:
+            await asyncio.sleep(0.1)  # Adjust as needed
+    finally:
+        unsubscribe()
 
-    global iter, complete, window
-    iter = 0  # loop counter
-    complete = False
-    iters = 100                 # how many seconds of data to collect
+    # begin data callback
+
+# task 2: process data
+async def eeg_process(data_queue, model, W):
     window = []
+    iter = 0
+    iters = 100  # how many seconds of data to collect
 
-    # load saved model & spatial filters
-    model_file = joblib.load(
-        '/Users/jamborghini/Documents/PYTHON/neurosity_multicontrol/models/lda_2024-07-19 22:37:28.677998.joblib')
-    model = model_file['model']
-    W = model_file['spatial_filters']
-
-    # pull & process EEG data
-    def callback(data):
-        global iter, complete, window
+    while True:
+        signals = await data_queue.get()
         iter += 1
         print(f'iter: {iter}')
 
-        signals = np.array(data['data'])
         for i in range(signals.shape[1]):
-            ## improve this code with dequeue (no for loop)
             window.append(signals[:, i].tolist())
 
-        # if over 2 seconds of total data collected, create sliding window of previous 2 seconds
         if iter > 32:
-            # create sliding window
             window = window[16:]
-            # processing & model inference - separate thread?
-            crown_realtime_processing.main(window, model, W)
+            # Assuming crown_realtime_processing.main is CPU-intensive:
+            await asyncio.to_thread(crown_realtime_processing.main, window, model, W)
 
         if iter >= 16 * iters:
-            time.sleep(10)
-            complete = True
-            unsubscribe()
+            break
 
-    # begin data callback
-    unsubscribe = neurosity.brainwaves_raw_unfiltered(callback)
+async def main():
 
+    neurosity = await initialise()                      # initialise Crown headset
+    data_queue = asyncio.Queue()                        # create queue for signal data to append to
+
+    # load saved model & spatial filters
+    model_file = joblib.load(
+        '/Users/jamborghini/Documents/PYTHON/neurosity_multicontrol/models/lda_2024-07-21 13:37:50.903718.joblib')
+    model = model_file['model']
+    W = model_file['spatial_filters']
+
+    # run coroutines
+    async with asyncio.TaskGroup() as tg:
+        task1 = tg.create_task(eeg_stream(data_queue, neurosity))
+        task2 = tg.create_task(eeg_process(data_queue, model, W))
+
+    await asyncio.gather(task1, task2)
 
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
 
 
 
