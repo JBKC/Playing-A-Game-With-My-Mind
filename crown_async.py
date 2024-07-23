@@ -51,35 +51,42 @@ async def eeg_stream(data_queue, neurosity):
     # create callback that continuously extracts signals
     async def callback(data):
         signals = np.array(data['data'])
-        # pause signal extraction until coroutine completes
+        # shift focus to eeg_processing
         await data_queue.put(signals)
 
+    # initiate callback
     unsubscribe = await neurosity.brainwaves_raw_unfiltered(callback)
+
+    # stream data indefinitely
     try:
         while True:
-            await asyncio.sleep(0.1)  # Adjust as needed
+            pass
+    # stop the stream when program exits
     finally:
         unsubscribe()
 
-    # begin data callback
 
 # task 2: process data
-async def eeg_process(data_queue, model, W):
+async def eeg_processing(data_queue, model, W):
     window = []
     iter = 0
     iters = 100  # how many seconds of data to collect
 
     while True:
+        # take the first datapoint in the queue
         signals = await data_queue.get()
         iter += 1
         print(f'iter: {iter}')
 
+        # add latest data to a shifting window
         for i in range(signals.shape[1]):
             window.append(signals[:, i].tolist())
 
+        # if over 2 seconds of data collected, run inference on trailing 2 second window
         if iter > 32:
+            # shift the window forward by one datapacket
             window = window[16:]
-            # Assuming crown_realtime_processing.main is CPU-intensive:
+            # process data while allowing eeg_stream to collect more data
             await asyncio.to_thread(crown_realtime_processing.main, window, model, W)
 
         if iter >= 16 * iters:
@@ -92,15 +99,16 @@ async def main():
 
     # load saved model & spatial filters
     model_file = joblib.load(
-        '/Users/jamborghini/Documents/PYTHON/neurosity_multicontrol/models/lda_2024-07-21 13:37:50.903718.joblib')
+        'models/lda_2024-07-21 13:37:50.903718.joblib')
     model = model_file['model']
     W = model_file['spatial_filters']
 
-    # run coroutines
+    # create tasks
     async with asyncio.TaskGroup() as tg:
         task1 = tg.create_task(eeg_stream(data_queue, neurosity))
-        task2 = tg.create_task(eeg_process(data_queue, model, W))
+        task2 = tg.create_task(eeg_processing(data_queue, model, W))
 
+    # run tasks
     await asyncio.gather(task1, task2)
 
 
