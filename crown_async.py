@@ -49,17 +49,20 @@ async def initialise():
 ################################
 
 # task 1: pull EEG data
-async def eeg_stream(data_queue, neurosity):
-    # create callback that continuously extracts signals
-
-    # Neurosity SDK expects a synchronous function
+def eeg_stream_callback(data_queue, loop):
     def callback(data):
         signals = np.array(data['data'])
-        # append data to queue
-        data_queue.put(signals)
+        # append data to queue on the event loop
+        asyncio.run_coroutine_threadsafe(data_queue.put(signals), loop)
         print(f'QUEUE LENGTH: {data_queue.qsize()}')
 
-    # initiate callback
+    return callback
+
+async def eeg_stream(data_queue, neurosity):
+    loop = asyncio.get_running_loop()                                   # get event loop
+    callback = eeg_stream_callback(data_queue, loop)
+
+    # neurosity expects synchronous callback
     unsubscribe = neurosity.brainwaves_raw_unfiltered(callback)
 
     # stream data indefinitely
@@ -68,7 +71,7 @@ async def eeg_stream(data_queue, neurosity):
             # yield control back to event loop
             await asyncio.sleep(0)
 
-    # stop the stream when program exits
+    # stop stream when program exits
     finally:
         unsubscribe()
 
@@ -81,7 +84,7 @@ async def eeg_processing(data_queue, model, W):
     while True:
         try:
             # take the first datapacket in the queue
-            signals = data_queue.get()
+            signals = await data_queue.get()
             iter += 1
             print(f'iter: {iter}')
 
@@ -106,7 +109,7 @@ async def eeg_processing(data_queue, model, W):
 async def main():
 
     neurosity = await initialise()                    # initialise Crown headset
-    data_queue = queue.Queue()                        # create FIFO queue to hold signal data
+    data_queue = asyncio.Queue()                      # create FIFO queue to hold signal data
 
     # load saved model & spatial filters
     model_file = joblib.load('models/lda_2024-07-21 13:37:50.903718.joblib')
