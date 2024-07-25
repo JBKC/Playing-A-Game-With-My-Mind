@@ -70,6 +70,8 @@ def main(window, model, W):
     '''
     Takes in window of shape (512,8)
     '''
+    window = np.array(window)
+    print(window.shape)
 
     print(f'Spatial Filters shape: {W.shape}')
 

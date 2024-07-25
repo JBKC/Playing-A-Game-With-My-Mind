@@ -54,7 +54,7 @@ def eeg_stream_callback(buffer):
         signals = np.array(data['data'])
         # add data to sliding buffer
         for i in range(signals.shape[1]):
-            buffer.append(signals[:, i].tolist())
+            buffer.append([signals[:, i] for i in range(signals.shape[1])])
 
         print(f'Buffer length: {len(buffer)}')
 
@@ -108,6 +108,7 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
+
 
 
 
