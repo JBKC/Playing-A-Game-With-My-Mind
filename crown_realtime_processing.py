@@ -67,6 +67,9 @@ def compute_psd(tensor):
     return np.array(freqs), np.array(PSD)
 
 def main(window, model, W):
+    '''
+    Takes in window of shape (512,8)
+    '''
 
     print(f'Spatial Filters shape: {W.shape}')
 
