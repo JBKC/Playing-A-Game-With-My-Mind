@@ -48,23 +48,25 @@ async def initialise():
 
 ################################
 
-def eeg_stream_callback(buffer):
+async def put_buffer(buffer, signals):
+    await buffer.put(signals)
+
+def eeg_stream_callback(buffer, loop):
     def callback(data):
         # retrieve new data
         signals = np.array(data['data'])
-        # add data to sliding buffer
-        for i in range(signals.shape[1]):
-            buffer.append([signals[:, i] for i in range(signals.shape[1])])
-
-        print(f'Buffer length: {len(buffer)}')
+        # append data to queue on the event loop
+        asyncio.run_coroutine_threadsafe(put_buffer(buffer, signals), loop)
+        print(f'Buffer size: {buffer.qsize()}')
 
     return callback
 
-# coroutine 1: pull EEG data
+# coroutine 1: pull EEG data (producer)
 async def eeg_stream(buffer, neurosity):
 
-    callback = eeg_stream_callback(buffer)
-    unsubscribe = neurosity.brainwaves_raw_unfiltered(callback)                 # neurosity expects synchronous callback
+    loop = asyncio.get_running_loop()  # get event loop
+    callback = eeg_stream_callback(buffer, loop)
+    unsubscribe = neurosity.brainwaves_raw_unfiltered(callback)         # neurosity expects synchronous callback
 
     try:
         while True:
@@ -74,23 +76,34 @@ async def eeg_stream(buffer, neurosity):
     # stop stream when program exits
     finally:
         unsubscribe()
+        await buffer.put(None)          # signal end of stream
 
-# coroutine 2: process EEG data
+# coroutine 2: process EEG data (consumer)
 async def eeg_processing(buffer, maxlen, model, W):
 
-    while True:
-        # start processing if buffer is at maximum length
-        if len(buffer) >= maxlen:
-            # process data in buffer
-            await asyncio.to_thread(crown_realtime_processing.main, buffer, model, W)
+    queue = collections.deque(maxlen=maxlen)         # create sliding window (double ended queue)
 
-        await asyncio.sleep(0)
+    while True:
+        # get latest entry in buffer
+        item = await buffer.get()
+        print(f'Window (queue) size: {len(queue)}')
+        # if final iteration, terminate coroutine
+        if item is None:
+            break
+
+        # append latest item to window
+        queue.append(item)
+
+        # start processing at the point where queue reaches max length
+        if len(queue) == 32:
+            batch = np.concatenate(queue, axis = 1)
+            await asyncio.to_thread(crown_realtime_processing.main, batch, model, W)
 
 async def main():
 
     neurosity = await initialise()                    # initialise Crown headset
-    maxlen = 32*16
-    buffer = collections.deque(maxlen=maxlen)         # create sliding window (buffer)
+    maxlen = 32
+    queue = asyncio.Queue(maxsize=maxlen)         # create sliding window (queue)
 
     # load saved model & spatial filters
     model_file = joblib.load('models/lda_2024-07-21 13:37:50.903718.joblib')
@@ -99,8 +112,8 @@ async def main():
 
     # create tasks
     async with asyncio.TaskGroup() as tg:
-        task1 = tg.create_task(eeg_stream(buffer, neurosity))
-        task2 = tg.create_task(eeg_processing(buffer, maxlen, model, W))
+        task1 = tg.create_task(eeg_stream(queue, neurosity))
+        task2 = tg.create_task(eeg_processing(queue, maxlen, model, W))
 
     # run tasks
     await asyncio.gather(task1, task2)
@@ -108,7 +121,6 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
-
 
 
 

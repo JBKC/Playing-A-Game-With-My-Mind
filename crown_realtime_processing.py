@@ -68,16 +68,12 @@ def compute_psd(tensor):
 
 def main(window, model, W):
     '''
-    Takes in window of shape (512,8)
+    Takes in window of shape (8,512)
     '''
-    window = np.array(window)
-    print(window.shape)
 
+    X = np.expand_dims(window, axis=0)                       # shape (1, n_channels, n_samples)
+    print(f'Input Processing shape: {X.shape}')
     print(f'Spatial Filters shape: {W.shape}')
-
-    X = np.transpose(np.array(window), (1, 0))             # shape (1, n_channels, n_samples)
-    X = np.expand_dims(X, axis=0)
-    print(f'Input window shape: {X.shape}')
 
     # pass window through preprocessing steps
     # normalise + bandpass
