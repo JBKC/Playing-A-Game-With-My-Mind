@@ -177,7 +177,6 @@ async def main():
         task2 = tg.create_task(eeg_processing(buffer, maxlen, model, W, probs_queue))
         task3 = tg.create_task(pygame_display(probs_queue))
 
-
     # run tasks
     await asyncio.gather(task1, task2, task3)
 
