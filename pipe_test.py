@@ -20,7 +20,7 @@ try:
         while True:
             data = ser.readline().decode('utf-8').strip().split(',')
 
-            # Initialize command
+            # initialize command
             command = ''
 
             # get individual gyro data
