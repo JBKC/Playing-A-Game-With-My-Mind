@@ -1,29 +1,49 @@
+'''
+Send realtime gyro inputs to pipeline to be used by gaming emulator
+'''
+
 import os
 import time
 import serial
+import fcntl
+
 
 fifo_path = "/Users/jamborghini/Library/Application Support/Dolphin/Pipes/fifo_pipe"
 arduino_port = '/dev/tty.usbmodem14201'
 baud_rate = 115200
 
-
-
-# Open the named pipe
-# fifo = os.open(fifo_path, os.O_WRONLY)
-print("test")
-
 # Open the serial port
 ser = serial.Serial(arduino_port, baud_rate)
 
 try:
-    while True:
-        data = ser.readline().decode('utf-8').strip().split(',')
-        x_data = data[0]
-        y_data = data[1]
-        z_data = data[2]
-        print(x_data)
-        # os.write(fifo, gyro_data.encode('utf-8'))
-        # time.sleep(0.01)  # Add a small delay to avoid overwhelming the pipe
+    with open(fifo_path, 'w') as fifo:
+        while True:
+            data = ser.readline().decode('utf-8').strip().split(',')
+
+            # Initialize command
+            command = ''
+
+            # get individual gyro data
+            x_data = data[0]
+            y_data = data[1]
+            z_data = float(data[2])
+            print(z_data)
+
+            if z_data > 0:
+                command = 'A'
+
+            if command:
+                fifo.write(command + '\n')
+                fifo.flush()
+                print("COMMAND SENT")
+
+
 finally:
     ser.close()
-    # os.close(fifo)
+
+
+
+'''
+- calibrate gyro by holding steady for 5 seconds in "resting" state
+- movements to the emulator are a function of how much the gyro has moved from the calibrated state
+'''
