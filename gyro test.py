@@ -49,7 +49,6 @@ async def pygame_display(buffer):
     :param: buffer: of incoming gyro data
     '''
 
-
     pygame.init()
     width, height = 600, 600
     screen = pygame.display.set_mode((width, height))
@@ -93,7 +92,7 @@ async def main():
     arduino_port = '/dev/tty.usbmodem14201'
     baud_rate = 115200
 
-    buffer = asyncio.Queue()      # create buffer
+    buffer = collections.deque  # deque as buffer
 
     # Open the serial port
     ser = serial.Serial(arduino_port, baud_rate)
