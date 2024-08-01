@@ -22,20 +22,22 @@ try:
 
             # initialize command
             command = ''
+            print(data)
+
 
             # get individual gyro data
-            x_data = data[0]
-            y_data = data[1]
+            x_data = float(data[0])
+            y_data = float(data[1])
             z_data = float(data[2])
-            print(z_data)
 
-            if z_data > 0:
-                command = 'A'
 
-            if command:
-                fifo.write(command + '\n')
-                fifo.flush()
-                print("COMMAND SENT")
+            # if z_data > 0:
+            #     command = 'PRESS A'
+            #
+            # if command:
+            #     fifo.write(command + '\n')
+            #     fifo.flush()
+            #     print("COMMAND SENT")
 
 
 finally:
