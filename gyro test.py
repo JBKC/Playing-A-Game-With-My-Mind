@@ -1,5 +1,5 @@
 '''
-Translate gyro inputs into pygame onscreen input
+Translate gyro inputs into a moving dot in pygame GUI
 '''
 
 from neurosity import NeurositySDK
@@ -32,6 +32,7 @@ async def gyro_stream(buffer, ser):
     try:
         while True:
             data = ser.readline().decode('utf-8').strip().split(',')
+            # set data as only z axis
             data = data[2]
             asyncio.run_coroutine_threadsafe(put_buffer(buffer, data), loop)
 
@@ -72,8 +73,8 @@ async def pygame_display(buffer):
         screen.fill(BLACK)
 
         if data is not None:
-
-            x_distance = screen.get_width() / 2 + (30 * float(data))
+            # translate gyro z data into onscreen x movement 
+            x_distance = float(screen.get_width() / 2 + (30 * float(data)))
             print(x_distance)
 
             # Draw the dot
