@@ -77,6 +77,7 @@ async def pygame_display(buffer):
             print(x_distance)
 
             # Draw the dot
+            ## add in good x distance algo & function to smoothe movement
             pygame.draw.circle(screen, dot_color, (x_distance, screen.get_height() / 2), dot_radius)
 
             # Update the display
