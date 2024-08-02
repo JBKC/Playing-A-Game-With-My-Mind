@@ -92,7 +92,7 @@ async def main():
     arduino_port = '/dev/tty.usbmodem14201'
     baud_rate = 115200
 
-    buffer = asyncio.Queue()      # create buffer
+    buffer = collections.deque()      # create buffer
 
     # Open the serial port
     ser = serial.Serial(arduino_port, baud_rate)
