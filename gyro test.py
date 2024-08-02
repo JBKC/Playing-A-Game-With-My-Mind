@@ -21,9 +21,6 @@ import io
 
 ################################
 
-async def put_buffer(buffer, data):
-    await buffer.put(data)
-
 # coroutine 1: get gyro data (producer)
 async def gyro_stream(buffer, ser):
 
@@ -33,7 +30,7 @@ async def gyro_stream(buffer, ser):
         while True:
             data = ser.readline().decode('utf-8').strip().split(',')
             data = data[2]
-            asyncio.run_coroutine_threadsafe(put_buffer(buffer, data), loop)
+            buffer.append(data)
 
             # yield control back to event loop after callback has been executed
             await asyncio.sleep(0)
