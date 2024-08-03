@@ -36,7 +36,7 @@ try:
                     'PRESS A'}
             if y_data > 5:
                 commands = {
-                    'PRESS B'}
+                    'RELEASE A'}
 
             # menu commands
             if x_data > 5:
@@ -58,15 +58,9 @@ try:
                     'SET MAIN 0.5 0.5',
                 }
 
-            if -2 < y_data < 2:
-                commands = {
-                    'RELEASE A',
-                    'RELEASE B',
-                }
-
             if commands:
                 for command in commands:
-                    # fifo.write('PRESS A' + '\n')
+                    fifo.write('RELEASE B' + '\n')
                     fifo.write(command + '\n')
                     fifo.flush()
                     print(f'{command} SENT')
