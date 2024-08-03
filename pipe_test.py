@@ -31,27 +31,25 @@ try:
             y_data = float(data[1])
             # z_data = float(data[2])
 
-            # if y_data < -5:
-            #     commands = {
-            #         'PRESS A'}
-            # if y_data > 5:
-            #     commands = {
-            #         'PRESS B'}
+            if y_data < -5:
+                commands = {
+                    'PRESS A'}
+            if y_data > 5:
+                commands = {
+                    'PRESS B'}
 
             # menu commands
             if x_data > 5:
                 commands = {
-                    'PRESS D_DOWN',
-                    'SET MAIN 1 0.5',
+                    'PRESS D_DOWN',                                 # menu command
+                    f'SET MAIN {0.2 * x_data} 0.5',                 # analog stick
                 }
+
             if x_data < -5:
                 commands = {
                     'PRESS D_UP',
-                    'SET MAIN 0 0.5',
+                    f'SET MAIN {0.2 * x_data + 1} 0.5',
                 }
-
-            # steering control
-            for x in range()
 
             if -2 < x_data < 2:
                 commands = {
@@ -60,15 +58,15 @@ try:
                     'SET MAIN 0.5 0.5',
                 }
 
-            # if -2 < y_data < 2:
-            #     commands = {
-            #         'RELEASE A',
-            #         'RELEASE B',
-            #     }
+            if -2 < y_data < 2:
+                commands = {
+                    'RELEASE A',
+                    'RELEASE B',
+                }
 
             if commands:
                 for command in commands:
-                    fifo.write('PRESS A' + '\n')
+                    # fifo.write('PRESS A' + '\n')
                     fifo.write(command + '\n')
                     fifo.flush()
                     print(f'{command} SENT')
