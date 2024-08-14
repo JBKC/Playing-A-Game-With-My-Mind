@@ -38,8 +38,8 @@ def plot_frequency_domain(freqs, P1):
 
     # plot frequency domain
     plt.plot(freqs, P1, color='black', linewidth=1)
-    plt.set_ylim(0, 1)
-    plt.set_xlim(0, 30)
+    # plt.set_ylim(0, 1)
+    # plt.set_xlim(0, 30)
 
     plt.tight_layout()
     plt.show()
