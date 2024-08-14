@@ -15,47 +15,7 @@ import crown_artifacts
 from scipy import interpolate
 import crown_full_feature_extraction as features
 
-def plot_psd(freqs, P1, P2, CSP=True):
-    '''
-    :params P1, P2: shape (n_trials, n_channels, n_samples/2 + 1)
-    '''
 
-    channel_names = ['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6', 'C4', 'CP4']
-
-    # Create subplots
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 5))
-
-    if CSP:
-        # plot the first and last eigenvectors (the most extreme discrimination)
-        ax1.plot(freqs, P1[:, 0, :].mean(axis=0), color='red', linewidth=1, label='right')
-        ax1.plot(freqs, P2[:, 0, :].mean(axis=0), color='blue', linewidth=1, label='left')
-        ax2.plot(freqs, P1[:, -1, :].mean(axis=0), color='red', linewidth=1, label='right')
-        ax2.plot(freqs, P2[:, -1, :].mean(axis=0), color='blue', linewidth=1, label='left')
-        ax1.set_ylim(0, 1)
-        ax2.set_ylim(0, 1)
-
-    if not CSP:
-        # plot channels C3 and C4
-        ax1.plot(freqs, P1[:, 1, :].mean(axis=0), color='red', linewidth=1, label='right')
-        ax1.plot(freqs, P2[:, 1, :].mean(axis=0), color='blue', linewidth=1, label='left')
-        ax2.plot(freqs, P1[:, 6, :].mean(axis=0), color='red', linewidth=1, label='right')
-        ax2.plot(freqs, P2[:, 6, :].mean(axis=0), color='blue', linewidth=1, label='left')
-        ax1.set_title(f'PSD for {channel_names[1]} (controls right side)')
-        ax2.set_title(f'PSD for {channel_names[6]} (controls left side)')
-        ax1.set_ylim(0, 50)
-        ax2.set_ylim(0, 50)
-
-    ax1.set_xlabel('Frequency (Hz)')
-    ax1.set_ylabel('Power Spectral Density')
-    ax1.set_xlim(0, 30)
-    ax1.legend()
-    ax2.set_xlabel('Frequency (Hz)')
-    ax2.set_ylabel('Power Spectral Density')
-    ax2.set_xlim(0, 30)
-    ax2.legend()
-
-    plt.tight_layout()
-    plt.show()
 
 def logvar(PSD):
     '''
@@ -390,7 +350,6 @@ def main():
     L1 = logvar(X1_csp)
     L2 = logvar(X2_csp)
 
-    freqs_raw, P1_raw = compute_psd(X1)
     _, P2_raw = compute_psd(X2)
 
     plot_psd(freqs_raw, P1_raw, P2_raw, CSP=False)
