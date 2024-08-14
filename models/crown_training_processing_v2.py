@@ -1,12 +1,11 @@
 '''
-version 2 - Full feature breakdown
+version 2 - Full feature breakdown. Uses crown_full_feature_extraction file
 Process saved json data for ML training
 8 channels in order: CP3, C3, F5, PO3, PO4, F6, C4, CP4
 '''
 
 import json
 import scipy.io
-from scipy.signal import butter, filtfilt
 import numpy as np
 import scipy.linalg
 import os
@@ -14,6 +13,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import crown_artifacts
 from scipy import interpolate
+import crown_full_feature_extraction as features
 
 def plot_psd(freqs, P1, P2, CSP=True):
     '''
@@ -107,19 +107,7 @@ def scatter_logvar(L1, L2):
 
     plt.show()
 
-def bpass_filter(data, lowcut, highcut, fs, order=5):
 
-    # signal params
-    nyquist = 0.5 * fs
-    low = lowcut / nyquist
-    high = highcut / nyquist
-    b, a = butter(order, [low, high], btype='band')
-
-    return filtfilt(b, a, data, axis=2)
-
-def normalise(signal):
-    # Z-score normalisation
-    return (signal - np.mean(signal)) / np.std(signal)
 
 def compute_psd(tensor):
     '''
@@ -293,7 +281,7 @@ def main():
 
     def artifacts(X, method='discard'):
         '''
-        2 ways of dealing with artifacts (in the form of big spikes) -
+        2 ways of dealing with artifacts (in the form of big spikes in the raw signal data) -
         discard the whole signal or correct for them
         :params: X = 3D tensor of shape (n_trials, n_channels, n_samples)
         :return: 3D tensor of shape (n_trials, n_channels, n_samples)
@@ -331,7 +319,7 @@ def main():
     X2 = None                     # class 2
 
     # pull saved files from distinct folders each containing a single session
-    root = "training_data"
+    root = "/Users/jamborghini/Documents/PYTHON/neurosity_multicontrol/training_data"
 
     for folder in os.listdir(root):
         if folder == ".DS_Store":
@@ -389,9 +377,10 @@ def main():
     print(f'Class 1 trials: {X1.shape[0]}')
     print(f'Class 2 trials: {X2.shape[0]}')
 
-    # bandpass filter & normalise
-    X1_filt = normalise(bpass_filter(X1, 8, 15, 256))
-    X2_filt = normalise(bpass_filter(X2, 8, 15, 256))
+    ### now have signals labelled by class (left vs right)
+
+    # filters & feature extraction
+    feature_array = features.main(X1, X2)
 
     # pass data through spatial filters using CSP
     X1_csp, X2_csp, W = spatial_filter(X1=X1_filt, X2=X2_filt)
