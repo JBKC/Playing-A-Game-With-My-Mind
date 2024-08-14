@@ -28,7 +28,10 @@ def main(X1, X2):
     print(f'Class 1 trials: {X1.shape[0]}')
     print(f'Class 2 trials: {X2.shape[0]}')
 
-    print(len(X1[0][0]))
+    #
+
+    plt.plot(X1[0][0])
+    plt.show()
 
     # bandpass filter & normalise
     X1_filt = normalise(bpass_filter(X1, 8, 15, 256))
