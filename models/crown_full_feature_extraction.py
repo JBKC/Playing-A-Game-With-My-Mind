@@ -22,14 +22,15 @@ def normalise(signal):
 
 def main(X1, X2):
     '''
-    X1, X2 shape =
+    X1, X2 shape = (no. trials, no. channels, no. samples = no. seconds * fs)
     '''
+
+    print(f'Class 1 trials: {X1.shape[0]}')
+    print(f'Class 2 trials: {X2.shape[0]}')
 
     # bandpass filter & normalise
     X1_filt = normalise(bpass_filter(X1, 8, 15, 256))
     X2_filt = normalise(bpass_filter(X2, 8, 15, 256))
-
-    print(X1_filt.shape)
 
     plt.plot(X1_filt)
     plt.show()
