@@ -1,4 +1,5 @@
 '''
+version 1 - PSD only
 Process saved json data for ML training
 8 channels in order: CP3, C3, F5, PO3, PO4, F6, C4, CP4
 '''
