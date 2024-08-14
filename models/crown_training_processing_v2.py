@@ -350,12 +350,11 @@ def main():
                 onsets_1 = [(i[0]) for i in labels if i[-1] == -1]      # right data
                 onsets_2 = [(i[0]) for i in labels if i[-1] == 1]       # left data
 
-        # print(f'Number of class 1 trials: {len(onsets_1)}')
-        # print(f'Number of class 2 trials: {len(onsets_2)}')
-
         # match up class onsets with signal array
-        window_length = 2
-        delay = 0
+
+        window_length = 3.5         # how many seconds of data to take (must be sub 4 seconds)
+        delay = 0                   # how many seconds after prompt to start taking data from
+
         X1_session = assign_trials(stream, onsets_1, window_length=window_length, delay=delay)               # X1 = right
         X2_session = assign_trials(stream, onsets_2, window_length=window_length, delay=delay)               # X2 = left
 
@@ -373,9 +372,6 @@ def main():
             X2 = X2_session
         else:
             X2 = np.concatenate((X2, X2_session), axis=0)
-
-    print(f'Class 1 trials: {X1.shape[0]}')
-    print(f'Class 2 trials: {X2.shape[0]}')
 
     ### now have signals labelled by class (left vs right)
 
