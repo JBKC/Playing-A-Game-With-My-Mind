@@ -99,6 +99,7 @@ def scatter_logvar(L1, L2):
     :params L1,L2: shape (n_trials, n_channels)
     '''
 
+
     plt.figure(figsize=(8, 5))
 
     plt.scatter(L1[:, 0], L1[:, -1], color='red', linewidth=1, label='right')

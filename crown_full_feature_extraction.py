@@ -16,6 +16,7 @@ def bpass_filter(data, lowcut, highcut, fs, order=5):
     return filtfilt(b, a, data, axis=2)
 
 
+
 def normalise(signal):
     # Z-score normalisation
     return (signal - np.mean(signal)) / np.std(signal)
