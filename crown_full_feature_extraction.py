@@ -9,10 +9,12 @@ def normalise(signal):
     # Z-score normalisation
     return (signal - np.mean(signal)) / np.std(signal)
 
-def compute_psd(tensor):
+def compute_psd(dict, band):
 
-    freqs, PSD = scipy.signal.welch(tensor, fs=265, axis=0, nperseg=tensor.shape[0])
+    signal = dict[band][0,0,:]          # pull out a single signal
+    # print(signal.shape)
 
+    freqs, PSD = scipy.signal.welch(signal, fs=265, axis=0, nperseg=signal.shape[0])
     return np.array(freqs), np.array(PSD)
 
 def plot_freq_response(coeffs,fs):
@@ -52,33 +54,63 @@ def plot_frequency_domain(freqs, P1):
 
 def main(X1, X2):
     '''
+    X1 = signals for right side motor imagery
+    X2 = signals for left side motor imagery
     X1, X2 shape = (no. trials, no. channels, no. samples = no. seconds * fs)
+    3rd dimension is the individual signal data
     '''
 
     print(f'Class 1 trials: {X1.shape[0]}')
     print(f'Class 2 trials: {X2.shape[0]}')
 
-    X1 = X1[0][1]           # take example signal
-
-    plt.plot(X1)
-    plt.show()
-
-    # apply FIR filters
+    # apply FIR filters to split into frequency buckets
     fs = 256
-    low = 50
-    high = 60
-    cutoffs = [2*low / fs, 2*high / fs]          # normalise to nyquist
-    numtaps = 11
+    numtaps = 101
 
-    # get coefficients
-    coeffs = scipy.signal.firwin(numtaps=numtaps, cutoff=cutoffs, window='hamming')
-    X1_fir = scipy.signal.lfilter(coeffs, 1.0, X1)
+    bands = {
+        'delta': [0.5, 4],
+        'theta': [4, 8],
+        'alpha': [8, 12],
+        'beta': [12, 30],
+        'gamma': [30, 50],
+    }
 
-    plot_freq_response(coeffs, fs)
-    plot_phase_response(coeffs, fs)
+    # create dictionary of filtered tensors for each class
+    dict_X1 = {}
+    dict_X2 = {}
 
-    freqs_raw, P1 = compute_psd(X1_fir)
-    print(P1.shape)
+    for k, v in bands.items():
+        # normalise cutoffs to nyquist frequencies
+        cutoffs = [2 * v[0] / fs, 2 * v[1] / fs]         # normalise to nyquist
+        # get filter coefficients
+        coeffs = scipy.signal.firwin(numtaps=numtaps, cutoff=cutoffs, pass_zero=False, window='hamming')
+
+        X1_fir = np.zeros_like(X1)
+        X2_fir = np.zeros_like(X2)
+
+        # apply filter to X1 and X2
+        for i in range(X1.shape[0]):
+            for j in range(X1.shape[1]):
+                X1_fir[i, j, :] = scipy.signal.lfilter(coeffs, 1.0, X1[i, j, :])
+
+        for i in range(X2.shape[0]):
+            for j in range(X2.shape[1]):
+                X2_fir[i, j, :] = scipy.signal.lfilter(coeffs, 1.0, X2[i, j, :])
+
+        # add to dictionary of tensors
+        dict_X1[k] = X1_fir
+        dict_X2[k] = X2_fir
+
+        # plot_freq_response(coeffs, fs)
+        # plot_phase_response(coeffs, fs)
+
+    focus_band = 'theta'
+
+    # print(dict_X1[focus_band].shape)
+    # print(dict_X2[focus_band].shape)
+
+    # get PSD plots
+    freqs_raw, P1 = compute_psd(dict_X1, focus_band)
     plot_frequency_domain(freqs_raw, P1)
 
     return

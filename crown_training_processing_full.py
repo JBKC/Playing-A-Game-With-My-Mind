@@ -342,7 +342,7 @@ def main():
     #######################
 
     # pass data through spatial filters using CSP
-    X1_csp, X2_csp, W = spatial_filter(X1=X1_filt, X2=X2_filt)
+    # X1_csp, X2_csp, W = spatial_filter(X1=X1_filt, X2=X2_filt)
 
     # # get Power Spectral Densities from spatially filtered data
     # freqs, P1 = compute_psd(X1_csp)
