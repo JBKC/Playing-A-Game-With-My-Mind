@@ -26,6 +26,19 @@ def plot_freq_response(coeffs,fs):
     plt.grid()
     plt.show()
 
+def plot_phase_response(coeffs, fs):
+
+    # plot phase response
+    w, h = scipy.signal.freqz(coeffs, worN=8000)
+    plt.plot(0.5 * fs * w / np.pi, np.angle(h), 'r')
+    plt.title('Filter Phase Response')
+    plt.xlabel('Frequency [Hz]')
+    plt.ylabel('Phase [radians]')
+    plt.grid()
+
+    plt.tight_layout()
+    plt.show()
+
 def plot_frequency_domain(freqs, P1):
 
     channel_names = ['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6', 'C4', 'CP4']
@@ -50,7 +63,7 @@ def main(X1, X2):
     plt.plot(X1)
     plt.show()
 
-    # apply notch FIR filter
+    # apply FIR filters
     fs = 256
     low = 50
     high = 60
@@ -62,17 +75,11 @@ def main(X1, X2):
     X1_fir = scipy.signal.lfilter(coeffs, 1.0, X1)
 
     plot_freq_response(coeffs, fs)
+    plot_phase_response(coeffs, fs)
 
     freqs_raw, P1 = compute_psd(X1_fir)
     print(P1.shape)
     plot_frequency_domain(freqs_raw, P1)
-
-
-
-    # bandpass filter & normalise
-    # X1_filt = normalise(bpass_filter(X1, 8, 15, 256))
-    # X2_filt = normalise(bpass_filter(X2, 8, 15, 256))
-
 
     return
 
