@@ -5,34 +5,26 @@ import matplotlib.pyplot as plt
 import scipy.io
 
 
-
-def bpass_filter(data, lowcut, highcut, fs, order=5):
-
-    # signal params
-    nyquist = 0.5 * fs
-    low = lowcut / nyquist
-    high = highcut / nyquist
-    b, a = butter(order, [low, high], btype='band')
-
-    return filtfilt(b, a, data)
-
-# def notch_filter(data, )
-
 def normalise(signal):
     # Z-score normalisation
     return (signal - np.mean(signal)) / np.std(signal)
-
-def notch_filter(data, fs, f0, quality_factor):
-    b, a = scipy.signal.iirnotch(f0, quality_factor, fs)
-
-    return filtfilt(b, a, data)
-
 
 def compute_psd(tensor):
 
     freqs, PSD = scipy.signal.welch(tensor, fs=265, axis=0, nperseg=tensor.shape[0])
 
     return np.array(freqs), np.array(PSD)
+
+def plot_freq_response(coeffs,fs):
+
+    # plot the filter response (frequency vs amplitude)
+    w, h = scipy.signal.freqz(coeffs, worN=8000)
+    plt.plot(0.5 * fs * w / np.pi, np.abs(h), 'b')
+    plt.title('Band-pass FIR Filter Frequency Response')
+    plt.xlabel('Frequency [Hz]')
+    plt.ylabel('Amplitude')
+    plt.grid()
+    plt.show()
 
 def plot_frequency_domain(freqs, P1):
 
@@ -44,6 +36,7 @@ def plot_frequency_domain(freqs, P1):
     plt.tight_layout()
     plt.show()
 
+
 def main(X1, X2):
     '''
     X1, X2 shape = (no. trials, no. channels, no. samples = no. seconds * fs)
@@ -52,28 +45,25 @@ def main(X1, X2):
     print(f'Class 1 trials: {X1.shape[0]}')
     print(f'Class 2 trials: {X2.shape[0]}')
 
-    X1 = X1[0][1]
+    X1 = X1[0][1]           # take example signal
 
     plt.plot(X1)
     plt.show()
 
-    # apply FIR filters
-    # scipy.signal.firwin
-
-
-    # apply notch filter for power noise
+    # apply notch FIR filter
     fs = 256
-    f0 = 50                         # frequency to be removed
-    quality_factor = 30
+    low = 50
+    high = 60
+    cutoffs = [2*low / fs, 2*high / fs]          # normalise to nyquist
+    numtaps = 11
 
+    # get coefficients
+    coeffs = scipy.signal.firwin(numtaps=numtaps, cutoff=cutoffs, window='hamming')
+    X1_fir = scipy.signal.lfilter(coeffs, 1.0, X1)
 
+    plot_freq_response(coeffs, fs)
 
-    X1 = notch_filter(X1, fs, f0, quality_factor)
-
-    # X1 = bpass_filter(X1, 10, 30, fs=256, order=5)
-
-    # break out frequency components
-    freqs_raw, P1 = compute_psd(X1)
+    freqs_raw, P1 = compute_psd(X1_fir)
     print(P1.shape)
     plot_frequency_domain(freqs_raw, P1)
 
