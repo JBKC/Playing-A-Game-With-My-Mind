@@ -57,11 +57,16 @@ def main(X1, X2):
     plt.plot(X1)
     plt.show()
 
+    # apply FIR filters
+    # scipy.signal.firwin
+
 
     # apply notch filter for power noise
     fs = 256
     f0 = 50                         # frequency to be removed
     quality_factor = 30
+
+
 
     X1 = notch_filter(X1, fs, f0, quality_factor)
 

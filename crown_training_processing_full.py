@@ -280,7 +280,7 @@ def main():
     X2 = None                     # class 2
 
     # pull saved files from distinct folders each containing a single session
-    root = "/Users/jamborghini/Documents/PYTHON/neurosity_multicontrol/training_data"
+    root = "./training_data"
 
     for folder in os.listdir(root):
         if folder == ".DS_Store":
