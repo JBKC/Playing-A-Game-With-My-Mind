@@ -57,6 +57,7 @@ def main(X1, X2):
     plt.plot(X1)
     plt.show()
 
+
     # apply notch filter for power noise
     fs = 256
     f0 = 50                         # frequency to be removed
