@@ -7,15 +7,28 @@ import scipy.io
 
 def normalise(signal):
     # Z-score normalisation
-    return (signal - np.mean(signal)) / np.std(signal)
+    # return (signal - np.mean(signal)) / np.std(signal)
+    return signal - np.mean(signal)
 
 def compute_psd(dict, band):
 
     signal = dict[band][0,0,:]          # pull out a single signal
     # print(signal.shape)
 
-    freqs, PSD = scipy.signal.welch(signal, fs=265, axis=0, nperseg=signal.shape[0])
+    freqs, PSD = scipy.signal.welch(signal, fs=265, axis=0, nperseg=signal.shape[-1])
+
     return np.array(freqs), np.array(PSD)
+
+def compute_fft(dict, band, fs):
+
+    signal = dict[band][0,0,:]          # pull out a single signal
+    N = len(signal)
+
+    result = scipy.fft.fft(signal)[:N//2]
+    freqs = scipy.fft.fftfreq(N, 1/fs)[:N//2]
+
+    return freqs, result
+
 
 def plot_freq_response(coeffs,fs):
 
@@ -41,16 +54,21 @@ def plot_phase_response(coeffs, fs):
     plt.tight_layout()
     plt.show()
 
-def plot_frequency_domain(freqs, P1):
+def plot_psd(freqs, P1):
 
     channel_names = ['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6', 'C4', 'CP4']
 
     # plot frequency domain
     plt.plot(freqs, P1, color='black', linewidth=1)
-
     plt.tight_layout()
     plt.show()
 
+
+def plot_fft(freqs, fft):
+
+    plt.plot(freqs, fft, color='black', linewidth=1)
+    plt.tight_layout()
+    plt.show()
 
 def main(X1, X2):
     '''
@@ -68,7 +86,7 @@ def main(X1, X2):
     numtaps = 101
 
     bands = {
-        'delta': [0.5, 4],
+        'delta': [2, 10],
         'theta': [4, 8],
         'alpha': [8, 12],
         'beta': [12, 30],
@@ -91,10 +109,14 @@ def main(X1, X2):
         # apply filter to X1 and X2
         for i in range(X1.shape[0]):
             for j in range(X1.shape[1]):
+                # normalise signal
+                X1[i, j, :] = normalise(X1[i, j, :])
+                # apply filter
                 X1_fir[i, j, :] = scipy.signal.lfilter(coeffs, 1.0, X1[i, j, :])
 
         for i in range(X2.shape[0]):
             for j in range(X2.shape[1]):
+                X2[i, j, :] = normalise(X2[i, j, :])
                 X2_fir[i, j, :] = scipy.signal.lfilter(coeffs, 1.0, X2[i, j, :])
 
         # add to dictionary of tensors
@@ -104,14 +126,18 @@ def main(X1, X2):
         # plot_freq_response(coeffs, fs)
         # plot_phase_response(coeffs, fs)
 
-    focus_band = 'theta'
+    focus_band = 'alpha'
 
     # print(dict_X1[focus_band].shape)
     # print(dict_X2[focus_band].shape)
 
-    # get PSD plots
+    # FFT
+    freqs, fft = compute_fft(dict_X1, focus_band, fs)
+    plot_fft(freqs, fft)
+
+    # PSD
     freqs_raw, P1 = compute_psd(dict_X1, focus_band)
-    plot_frequency_domain(freqs_raw, P1)
+    plot_psd(freqs_raw, P1)
 
     return
 
