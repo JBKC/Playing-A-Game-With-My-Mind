@@ -16,7 +16,7 @@ def compute_psd(dict, band):
     # print(signal.shape)
 
     # use windowing to smooth FFT response
-    freqs, PSD = scipy.signal.welch(signal, fs=265, axis=0, nperseg=signal.shape[-1], window='blackmanharris')
+    freqs, PSD = scipy.signal.welch(signal, fs=265, axis=0, nperseg=signal.shape[-1], window='hann')
 
     return np.array(freqs), np.array(PSD)
 
@@ -87,7 +87,7 @@ def main(X1, X2):
     numtaps = 101
 
     bands = {
-        'delta': [2, 10],
+        # 'delta': [0.5, 4],
         'theta': [4, 8],
         'alpha': [8, 12],
         'beta': [12, 30],
@@ -102,7 +102,7 @@ def main(X1, X2):
         # normalise cutoffs to nyquist frequencies
         cutoffs = [2 * v[0] / fs, 2 * v[1] / fs]         # normalise to nyquist
         # get FIR filter coefficients using window method
-        coeffs = scipy.signal.firwin(numtaps=numtaps, cutoff=cutoffs, pass_zero=False, window='blackmanharris')
+        coeffs = scipy.signal.firwin(numtaps=numtaps, cutoff=cutoffs, pass_zero=False, window='hann')
 
         X1_fir = np.zeros_like(X1)
         X2_fir = np.zeros_like(X2)
@@ -127,7 +127,7 @@ def main(X1, X2):
         # plot_freq_response(coeffs, fs)
         # plot_phase_response(coeffs, fs)
 
-    focus_band = 'alpha'
+    focus_band = 'theta'
 
     # FFT
     # freqs, fft = compute_fft(dict_X1, focus_band, fs)
