@@ -15,7 +15,7 @@ def compute_psd(dict, band):
     signal = dict[band][0,0,:]          # pull out a single signal
     # print(signal.shape)
 
-    freqs, PSD = scipy.signal.welch(signal, fs=265, axis=0, nperseg=signal.shape[-1])
+    freqs, PSD = scipy.signal.welch(signal, fs=265, axis=0, nperseg=signal.shape[-1], window='blackmanharris')
 
     return np.array(freqs), np.array(PSD)
 
@@ -100,8 +100,8 @@ def main(X1, X2):
     for k, v in bands.items():
         # normalise cutoffs to nyquist frequencies
         cutoffs = [2 * v[0] / fs, 2 * v[1] / fs]         # normalise to nyquist
-        # get filter coefficients
-        coeffs = scipy.signal.firwin(numtaps=numtaps, cutoff=cutoffs, pass_zero=False, window='hamming')
+        # get FIR filter coefficients
+        coeffs = scipy.signal.firwin(numtaps=numtaps, cutoff=cutoffs, pass_zero=False, window='blackmanharris')
 
         X1_fir = np.zeros_like(X1)
         X2_fir = np.zeros_like(X2)
@@ -128,12 +128,9 @@ def main(X1, X2):
 
     focus_band = 'alpha'
 
-    # print(dict_X1[focus_band].shape)
-    # print(dict_X2[focus_band].shape)
-
     # FFT
-    freqs, fft = compute_fft(dict_X1, focus_band, fs)
-    plot_fft(freqs, fft)
+    # freqs, fft = compute_fft(dict_X1, focus_band, fs)
+    # plot_fft(freqs, fft)
 
     # PSD
     freqs_raw, P1 = compute_psd(dict_X1, focus_band)
