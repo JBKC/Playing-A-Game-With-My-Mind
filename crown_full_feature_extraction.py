@@ -15,6 +15,7 @@ def compute_psd(dict, band):
     signal = dict[band][0,0,:]          # pull out a single signal
     # print(signal.shape)
 
+    # use windowing to smooth FFT response
     freqs, PSD = scipy.signal.welch(signal, fs=265, axis=0, nperseg=signal.shape[-1], window='blackmanharris')
 
     return np.array(freqs), np.array(PSD)
@@ -100,7 +101,7 @@ def main(X1, X2):
     for k, v in bands.items():
         # normalise cutoffs to nyquist frequencies
         cutoffs = [2 * v[0] / fs, 2 * v[1] / fs]         # normalise to nyquist
-        # get FIR filter coefficients
+        # get FIR filter coefficients using window method
         coeffs = scipy.signal.firwin(numtaps=numtaps, cutoff=cutoffs, pass_zero=False, window='blackmanharris')
 
         X1_fir = np.zeros_like(X1)
