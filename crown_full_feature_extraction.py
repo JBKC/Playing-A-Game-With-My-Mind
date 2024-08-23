@@ -3,6 +3,8 @@ import numpy as np
 from scipy.signal import butter, filtfilt
 import matplotlib.pyplot as plt
 import scipy.io
+import mne
+from mne.preprocessing import compute_current_source_density
 
 
 def normalise(signal):
@@ -129,13 +131,21 @@ def main(X1, X2):
 
     focus_band = 'theta'
 
-    # FFT
-    # freqs, fft = compute_fft(dict_X1, focus_band, fs)
-    # plot_fft(freqs, fft)
+    ##### calculate coherence between different channels
+    # 1. perform CSD / surface Laplacian
+
+    # plot phase angles + phase angle differences for different combinations of electrodes
+
 
     # PSD
     freqs_raw, P1 = compute_psd(dict_X1, focus_band)
     plot_psd(freqs_raw, P1)
+
+    # FFT
+    # freqs, fft = compute_fft(dict_X1, focus_band, fs)
+    # plot_fft(freqs, fft)
+
+
 
     return
 
