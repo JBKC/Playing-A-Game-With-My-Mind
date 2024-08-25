@@ -6,6 +6,7 @@ Exploring connectivity / coherence between EEG channels during motor imagery
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.signal
+import mne
 from mne.channels import make_standard_montage
 
 
@@ -67,10 +68,70 @@ def surface_laplacian(tensor, channels, fs):
     :return:
     laplacian_tensor: array of same shape as input,
     '''
+    n_trials, n_channels, n_samples = tensor.shape
+    laplacian_tensor = np.zeros_like(tensor)
 
-    
+    # create mne info object
+    info = mne.create_info(ch_names=channels, sfreq=fs, ch_types='eeg')
+    montage = make_standard_montage('standard_1020')
+    info.set_montage(montage)
 
-    pass
+    for trial in range(n_trials):
+
+        raw = mne.io.RawArray(tensor[trial], info)
+
+        # Apply Surface Laplacian
+        laplacian = mne.preprocessing.compute_current_source_density(raw)
+
+        # Extract data and store in the new tensor
+        laplacian_tensor[trial] = laplacian.get_data()
+
+    return laplacian_tensor
+
+def topology_viz(tensor, channels, fs):
+    '''
+    Create a trial-averaged topological EEG map over time
+    '''
+
+    n_trials, n_channels, n_samples = tensor.shape
+
+    # create MNE object
+    info = mne.create_info(ch_names=channels, sfreq=fs, ch_types=['eeg'] * n_channels)
+
+    # define spatial layout of electrodes + apply to object
+    montage = mne.channels.make_standard_montage('standard_1020')
+    info.set_montage(montage)
+
+    # average data across trials + apply to object
+    avg_data = np.mean(tensor, axis=0)
+    raw = mne.io.RawArray(avg_data, info)
+
+    # set up evoked object to store trial-averaged data
+    events = np.array([[0, 0, 1]])
+    epoch = mne.Epochs(raw, events, tmin=0, tmax=raw.times[-1], baseline=None)
+
+    time_divisions = 5
+
+    evoked = epoch.average()
+    times = np.linspace(0, raw.times[-1], time_divisions)
+
+    # set number of time divisions to plot
+    fig, axes = plt.subplots(1, time_divisions+1, figsize=(18, 3))
+    for idx, time in enumerate(times):
+        evoked.plot_topomap(times=time, axes=axes[idx], show=False,
+                            extrapolate='head', time_unit='s', colorbar=False)
+
+    # Add colorbar
+    cbar_ax = axes[-1]
+    fig.colorbar(axes[0].images[0], cax=cbar_ax)
+
+    plt.tight_layout()
+    plt.show()
+
+    # # Create an animated topomap
+    # anim = evoked.animate_topomap(frame_rate=5, time_unit='s', extrapolate='head')
+    # plt.show()
+
 
 
 def main(dict, band, fs):
@@ -80,8 +141,9 @@ def main(dict, band, fs):
 
     channels = ['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6', 'C4', 'CP4']
 
-    phase_lag_index(dict[band])
-    surface_laplacian(dict[band], channels, fs)
+    topology_viz(dict[band], channels, fs)
+    # phase_lag_index(dict[band])
+    # # surface_laplacian(dict[band], channels, fs)
 
 
 if __name__ == '__main__':
