@@ -6,9 +6,8 @@ Exploring connectivity / coherence between EEG channels during motor imagery
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.signal
+from mne.channels import make_standard_montage
 
-def surface_laplacian:
-    pass
 
 def phase_lag_index(tensor):
     '''
@@ -58,14 +57,31 @@ def phase_lag_index(tensor):
     plot_matrix()
     plot_over_trials()
 
+def surface_laplacian(tensor, channels, fs):
+    '''
+    :params:
+    tensor: shape (n_trials, n_channels, n_samples)
+    channels: list of channel names
+    fs: sampling frequency
 
-def main(dict, band):
+    :return:
+    laplacian_tensor: array of same shape as input,
+    '''
+
+    
+
+    pass
+
+
+def main(dict, band, fs):
     '''
     Takes in dict where dict[band] has shape (n_trials, n_channels, n_samples)
     '''
 
+    channels = ['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6', 'C4', 'CP4']
+
     phase_lag_index(dict[band])
-    surface_laplacian
+    surface_laplacian(dict[band], channels, fs)
 
 
 if __name__ == '__main__':

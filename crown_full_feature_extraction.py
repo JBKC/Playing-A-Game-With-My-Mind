@@ -134,8 +134,8 @@ def main(X1, X2):
     focus_band = 'theta'
 
     ##### calculate coherence between different channels for each class
-    X1_coh = coherence_analysis.main(dict=dict_X1, band=focus_band)
-    # X2_coh = coherence_analysis.main(dict=dict_X2, band=focus_band)
+    X1_coh = coherence_analysis.main(dict=dict_X1, band=focus_band, fs=fs)
+    # X2_coh = coherence_analysis.main(dict=dict_X2, band=focus_band, fs=fs)
 
     # PSD
     # freqs_raw, P1 = compute_psd(dict_X1, focus_band)
