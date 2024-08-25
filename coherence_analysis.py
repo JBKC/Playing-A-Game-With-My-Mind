@@ -21,8 +21,8 @@ def phase_lag_index(tensor):
         for trial in range(tensor.shape[0]):
 
             # take examples from different electrodes:
-            signal1 = tensor[trial, 1, :]
-            signal2 = tensor[trial, 6, :]
+            signal1 = tensor[trial, channel, :]
+            signal2 = tensor[trial, channel+1, :]
 
             # calculate instantaneous phase angle using HT
             analytic1 = scipy.signal.hilbert(signal1)
