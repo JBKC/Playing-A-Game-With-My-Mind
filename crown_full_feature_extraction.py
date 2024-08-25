@@ -16,7 +16,7 @@ def normalise(signal):
 
 def compute_psd(dict, band):
 
-    signal = dict[band][0,0,:]          # pull out a single signal
+    signal = dict[band][0,0,:]          # pull out a single signal (test visualisation)
     # print(signal.shape)
 
     # use windowing to smooth FFT response
@@ -138,13 +138,12 @@ def main(X1, X2):
     # X2_coh = coherence_analysis.main(dict=dict_X2, band=focus_band)
 
     # PSD
-    freqs_raw, P1 = compute_psd(dict_X1, focus_band)
-    plot_psd(freqs_raw, P1)
+    # freqs_raw, P1 = compute_psd(dict_X1, focus_band)
+    # plot_psd(freqs_raw, P1)
 
     # FFT
     # freqs, fft = compute_fft(dict_X1, focus_band, fs)
     # plot_fft(freqs, fft)
-
 
 
     return
