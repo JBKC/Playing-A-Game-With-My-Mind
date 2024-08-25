@@ -51,9 +51,6 @@ def phase_lag_index(tensor):
             # append to PLI matrix
             pli_matrix[ch1,ch2] = av_pli
 
-    print(pli_matrix)
-    print(pli_matrix.shape)
-
     # visualise PLI between channels
     plt.imshow(pli_matrix, cmap='viridis', interpolation='nearest')
     plt.colorbar()  # Add a color bar to indicate the intensity scale
