@@ -3,6 +3,7 @@ import numpy as np
 from scipy.signal import butter, filtfilt
 import matplotlib.pyplot as plt
 import scipy.io
+import coherence_analysis
 import mne
 from mne.preprocessing import compute_current_source_density
 
@@ -131,11 +132,9 @@ def main(X1, X2):
 
     focus_band = 'theta'
 
-    ##### calculate coherence between different channels
-    # 1. perform CSD / surface Laplacian
-
-    # plot phase angles + phase angle differences for different combinations of electrodes
-
+    ##### calculate coherence between different channels for each class
+    X1_coh = coherence_analysis.main(dict=dict_X1, focus_band=focus_band)
+    X2_coh = coherence_analysis.main(dict=dict_X2, focus_band=focus_band)
 
     # PSD
     freqs_raw, P1 = compute_psd(dict_X1, focus_band)

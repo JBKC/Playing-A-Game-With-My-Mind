@@ -13,7 +13,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import crown_artifacts
 from scipy import interpolate
-import crown_full_feature_extraction as features
+import crown_full_feature_extraction
 
 
 
@@ -337,7 +337,7 @@ def main():
     ### now have signals labelled by class (left vs right)
 
     # filters & feature extraction
-    feature_array = features.main(X1, X2)
+    feature_array = crown_full_feature_extraction.main(X1, X2)
 
     #######################
 
