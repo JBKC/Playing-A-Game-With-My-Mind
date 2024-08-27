@@ -90,7 +90,8 @@ def surface_laplacian(tensor, channels, fs):
 
     return laplacian_tensor
 
-def common_av_reference()
+def common_av_reference():
+    
 
 def topology_viz(tensor_a, tensor_b, channels, fs, time_divisions=5):
     '''
