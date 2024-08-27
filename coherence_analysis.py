@@ -88,42 +88,42 @@ def surface_laplacian(tensor, channels, fs):
 
     return laplacian_tensor
 
-def topology_viz(tensor, channels, fs):
-    '''
-    Create a trial-averaged topological EEG map over time
-    '''
 
-    n_trials, n_channels, n_samples = tensor.shape
+def topology_viz(tensor_a, tensor_b, channels, fs, time_divisions=5):
+    '''
+    Compare trial-averaged topological EEG maps over time for two datasets
+    '''
+    n_trials, n_channels, n_samples = tensor_a.shape
 
-    # create MNE object
+    # Create MNE info object
     info = mne.create_info(ch_names=channels, sfreq=fs, ch_types=['eeg'] * n_channels)
 
-    # define spatial layout of electrodes + apply to object
+    # Define spatial layout of electrodes
     montage = mne.channels.make_standard_montage('standard_1020')
     info.set_montage(montage)
 
-    # average data across trials + apply to object
-    avg_data = np.mean(tensor, axis=0)
-    raw = mne.io.RawArray(avg_data, info)
+    # Process both tensors
+    evokeds = []
+    for tensor in [tensor_a, tensor_b]:
+        avg_data = np.mean(tensor, axis=0)
+        raw = mne.io.RawArray(avg_data, info)
+        events = np.array([[0, 0, 1]])
+        epoch = mne.Epochs(raw, events, tmin=0, tmax=raw.times[-1], baseline=None)
+        evokeds.append(epoch.average())
 
-    # set up evoked object to store trial-averaged data
-    events = np.array([[0, 0, 1]])
-    epoch = mne.Epochs(raw, events, tmin=0, tmax=raw.times[-1], baseline=None)
+    # plot comparison
+    times = np.linspace(0, evokeds[0].times[-1], time_divisions)
+    fig, axes = plt.subplots(2, time_divisions + 1, figsize=(18, 6))
 
-    time_divisions = 5
+    for tensor, evoked in enumerate(evokeds):
+        for idx, time in enumerate(times):
+            evoked.plot_topomap(times=time, axes=axes[tensor, idx], show=False,
+                                extrapolate='head', time_unit='s', colorbar=False)
 
-    evoked = epoch.average()
-    times = np.linspace(0, raw.times[-1], time_divisions)
-
-    # set number of time divisions to plot
-    fig, axes = plt.subplots(1, time_divisions+1, figsize=(18, 3))
-    for idx, time in enumerate(times):
-        evoked.plot_topomap(times=time, axes=axes[idx], show=False,
-                            extrapolate='head', time_unit='s', colorbar=False)
-
-    # Add colorbar
-    cbar_ax = axes[-1]
-    fig.colorbar(axes[0].images[0], cax=cbar_ax)
+    # Add colorbars
+    for row in range(2):
+        cbar_ax = axes[row, -1]
+        fig.colorbar(axes[row, 0].images[0], cax=cbar_ax)
 
     plt.tight_layout()
     plt.show()
@@ -141,9 +141,10 @@ def main(dict, band, fs):
 
     channels = ['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6', 'C4', 'CP4']
 
-    topology_viz(dict[band], channels, fs)
+    laplacian_tensor = surface_laplacian(dict[band], channels, fs)
+    topology_viz(dict[band], laplacian_tensor, channels, fs)
+
     # phase_lag_index(dict[band])
-    # # surface_laplacian(dict[band], channels, fs)
 
 
 if __name__ == '__main__':
