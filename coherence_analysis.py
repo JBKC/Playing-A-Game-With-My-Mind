@@ -134,6 +134,7 @@ def topology_viz(tensor_a, tensor_b, channels, fs, time_divisions=5):
 
 
 
+
 def main(dict, band, fs):
     '''
     Takes in dict where dict[band] has shape (n_trials, n_channels, n_samples)
