@@ -10,7 +10,7 @@ import mne
 from mne.channels import make_standard_montage
 
 
-def phase_lag_index(tensor):
+def phase_lag_index(tensor, channels):
     '''
     Calculates the PLI over trials
     '''
@@ -18,6 +18,8 @@ def phase_lag_index(tensor):
     def plot_matrix():
         plt.figure(figsize=(6, 6))  # Set the figure size
         plt.imshow(pli_matrix, cmap='coolwarm', interpolation='nearest')  # Plot the array
+        plt.xticks(range(len(channels)), channels, rotation=45, ha='right')
+        plt.yticks(range(len(channels)), channels)
         plt.colorbar()  # Add a color bar to indicate the intensity scale
 
     def plot_over_trials():
@@ -88,6 +90,7 @@ def surface_laplacian(tensor, channels, fs):
 
     return laplacian_tensor
 
+def common_av_reference()
 
 def topology_viz(tensor_a, tensor_b, channels, fs, time_divisions=5):
     '''
@@ -118,7 +121,7 @@ def topology_viz(tensor_a, tensor_b, channels, fs, time_divisions=5):
     for tensor, evoked in enumerate(evokeds):
         for idx, time in enumerate(times):
             evoked.plot_topomap(times=time, axes=axes[tensor, idx], show=False,
-                                extrapolate='head', time_unit='s', colorbar=False)
+                                extrapolate='head', time_unit='s', colorbar=False, show_names=True)
 
     # Add colorbars
     for row in range(2):
@@ -134,7 +137,6 @@ def topology_viz(tensor_a, tensor_b, channels, fs, time_divisions=5):
 
 
 
-
 def main(dict, band, fs):
     '''
     Takes in dict where dict[band] has shape (n_trials, n_channels, n_samples)
@@ -142,10 +144,11 @@ def main(dict, band, fs):
 
     channels = ['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6', 'C4', 'CP4']
 
-    laplacian_tensor = surface_laplacian(dict[band], channels, fs)
+    # laplacian_tensor = surface_laplacian(dict[band], channels, fs)
+    common_av_reference()
     topology_viz(dict[band], laplacian_tensor, channels, fs)
 
-    # phase_lag_index(dict[band])
+    # phase_lag_index(dict[band], channels)
 
 
 if __name__ == '__main__':
