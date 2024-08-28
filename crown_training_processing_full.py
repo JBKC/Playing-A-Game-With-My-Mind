@@ -69,7 +69,6 @@ def scatter_logvar(L1, L2):
     plt.show()
 
 
-
 def compute_psd(tensor):
     '''
     :param takes in 3D tensor of shape (n_trials, n_channels, n_samples)

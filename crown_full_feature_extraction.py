@@ -131,7 +131,7 @@ def main(X1, X2):
         # plot_freq_response(coeffs, fs)
         # plot_phase_response(coeffs, fs)
 
-    focus_band = 'gamma'
+    focus_band = 'alpha'
 
     ##### calculate coherence between different channels for each class
     X1_coh = coherence_analysis.main(dict=dict_X1, band=focus_band, fs=fs)

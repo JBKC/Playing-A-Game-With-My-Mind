@@ -6,21 +6,23 @@ Exploring connectivity / coherence between EEG channels during motor imagery
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.signal
+from scipy import stats
 import mne
 from mne.channels import make_standard_montage
 
+
+def plot_matrix(matrix, channels):
+    plt.figure(figsize=(6, 6))  # Set the figure size
+    plt.imshow(matrix, cmap='coolwarm', interpolation='nearest')  # Plot the array
+    plt.xticks(range(len(channels)), channels, rotation=45, ha='right')
+    plt.yticks(range(len(channels)), channels)
+    plt.colorbar()  # Add a color bar to indicate the intensity scale
+    plt.show()
 
 def phase_lag_index(tensor, channels):
     '''
     Calculates the PLI over trials
     '''
-
-    def plot_matrix():
-        plt.figure(figsize=(6, 6))  # Set the figure size
-        plt.imshow(pli_matrix, cmap='coolwarm', interpolation='nearest')  # Plot the array
-        plt.xticks(range(len(channels)), channels, rotation=45, ha='right')
-        plt.yticks(range(len(channels)), channels)
-        plt.colorbar()  # Add a color bar to indicate the intensity scale
 
     def plot_over_trials():
 
@@ -57,7 +59,7 @@ def phase_lag_index(tensor, channels):
             # additional - average PLI over time
             pli_matrix = np.mean(plis, axis=-1)
 
-    plot_matrix()
+    plot_matrix(pli_matrix, channels)
     plot_over_trials()
 
 def surface_laplacian(tensor, channels, fs):
@@ -90,8 +92,14 @@ def surface_laplacian(tensor, channels, fs):
 
     return laplacian_tensor
 
-def common_av_reference():
-    
+def common_av_reference(tensor):
+
+    # average over all channels for each trial
+    avgs = np.mean(tensor, axis=1, keepdims=True)
+
+    # subtract from original tensor
+    return tensor - avgs
+
 
 def topology_viz(tensor_a, tensor_b, channels, fs, time_divisions=5):
     '''
@@ -136,6 +144,31 @@ def topology_viz(tensor_a, tensor_b, channels, fs, time_divisions=5):
     # anim = evoked.animate_topomap(frame_rate=5, time_unit='s', extrapolate='head')
     # plt.show()
 
+def ae_correlation(tensor, channels):
+    '''
+    amplitude envelope correlation
+    '''
+
+    n_trials, n_channels, n_samples = tensor.shape
+
+    # get instantaneous amplitude
+    analytic = scipy.signal.hilbert(tensor, axis=-1)
+    ae = np.abs(analytic)
+    # average across trials
+    ae = np.mean(ae, axis=0)            # shape (n_channels, n_samples)
+    print(ae.shape)
+
+    ae_matrix = np.zeros((n_channels, n_channels))
+
+    # cycle through channel combinations
+    for ch1 in range(n_channels):
+        for ch2 in range(n_channels):
+            ae_matrix[ch1,ch2], _ = stats.spearmanr(ae[ch1], ae[ch2])
+
+    np.fill_diagonal(ae_matrix, 0)
+
+    plot_matrix(ae_matrix, channels)
+
 
 
 def main(dict, band, fs):
@@ -145,12 +178,12 @@ def main(dict, band, fs):
 
     channels = ['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6', 'C4', 'CP4']
 
+    # car_tensor = common_av_reference(dict[band])
     # laplacian_tensor = surface_laplacian(dict[band], channels, fs)
-    common_av_reference()
-    topology_viz(dict[band], laplacian_tensor, channels, fs)
+    # topology_viz(dict[band], laplacian_tensor, channels, fs)
 
     # phase_lag_index(dict[band], channels)
-
+    ae_correlation(dict[band], channels)
 
 if __name__ == '__main__':
     main()
