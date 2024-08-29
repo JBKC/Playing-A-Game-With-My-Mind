@@ -1,5 +1,4 @@
 
-
 import numpy as np
 from scipy.signal import butter, filtfilt
 import matplotlib.pyplot as plt
@@ -34,7 +33,6 @@ def compute_fft(dict, band, fs):
 
     return freqs, result
 
-
 def plot_freq_response(coeffs,fs):
 
     # plot the filter response (frequency vs amplitude)
@@ -68,7 +66,6 @@ def plot_psd(freqs, P1):
     plt.tight_layout()
     plt.show()
 
-
 def plot_fft(freqs, fft):
 
     plt.plot(freqs, fft, color='black', linewidth=1)
@@ -83,12 +80,45 @@ def main(X1, X2):
     3rd dimension is the individual signal data
     '''
 
+    def fir_method(X, numtaps=101):
+        '''
+        initial attempt - use FIR filter to split signals into frequency bands
+        :params: input tensor X for a single class, of shape (n_trials, n_channels, n_samples)
+        :returns:
+        '''
+
+        # create dictionary of filtered tensor
+        dict = {}
+
+        for k, v in bands.items():
+            # normalise cutoffs to nyquist frequencies
+            cutoffs = [2 * v[0] / fs, 2 * v[1] / fs]         # normalise to nyquist
+            # get FIR filter coefficients using window method
+            coeffs = scipy.signal.firwin(numtaps=numtaps, cutoff=cutoffs, pass_zero=False, window='hann')
+
+            X_fir = np.zeros_like(X)
+
+            # apply filter to X
+            for i in range(X.shape[0]):
+                for j in range(X.shape[1]):
+                    # normalise signal
+                    X[i, j, :] = normalise(X[i, j, :])
+                    # apply filter
+                    X_fir[i, j, :] = scipy.signal.lfilter(coeffs, 1.0, X[i, j, :])
+
+
+            # add to dictionary of tensors
+            dict[k] = X_fir
+
+            # plot_freq_response(coeffs, fs)
+            # plot_phase_response(coeffs, fs)
+
+        return dict
+
     print(f'Class 1 trials: {X1.shape[0]}')
     print(f'Class 2 trials: {X2.shape[0]}')
 
-    # apply FIR filters to split into frequency buckets
     fs = 256
-    numtaps = 101
 
     bands = {
         # 'delta': [0.5, 4],
@@ -98,40 +128,10 @@ def main(X1, X2):
         'gamma': [30, 50],
     }
 
-    # create dictionary of filtered tensors for each class
-    dict_X1 = {}
-    dict_X2 = {}
+    # dict_X1 = fir_method(X1)
+    # dict_X2 = fir_method(X2)
 
-    for k, v in bands.items():
-        # normalise cutoffs to nyquist frequencies
-        cutoffs = [2 * v[0] / fs, 2 * v[1] / fs]         # normalise to nyquist
-        # get FIR filter coefficients using window method
-        coeffs = scipy.signal.firwin(numtaps=numtaps, cutoff=cutoffs, pass_zero=False, window='hann')
-
-        X1_fir = np.zeros_like(X1)
-        X2_fir = np.zeros_like(X2)
-
-        # apply filter to X1 and X2
-        for i in range(X1.shape[0]):
-            for j in range(X1.shape[1]):
-                # normalise signal
-                X1[i, j, :] = normalise(X1[i, j, :])
-                # apply filter
-                X1_fir[i, j, :] = scipy.signal.lfilter(coeffs, 1.0, X1[i, j, :])
-
-        for i in range(X2.shape[0]):
-            for j in range(X2.shape[1]):
-                X2[i, j, :] = normalise(X2[i, j, :])
-                X2_fir[i, j, :] = scipy.signal.lfilter(coeffs, 1.0, X2[i, j, :])
-
-        # add to dictionary of tensors
-        dict_X1[k] = X1_fir
-        dict_X2[k] = X2_fir
-
-        # plot_freq_response(coeffs, fs)
-        # plot_phase_response(coeffs, fs)
-
-    focus_band = 'alpha'
+    focus_band = 'gamma'
 
     ##### calculate coherence between different channels for each class
     X1_coh = coherence_analysis.main(dict=dict_X1, band=focus_band, fs=fs)

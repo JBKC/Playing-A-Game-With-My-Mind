@@ -19,6 +19,8 @@ def plot_matrix(matrix, channels):
     plt.colorbar()  # Add a color bar to indicate the intensity scale
     plt.show()
 
+    return
+
 def phase_lag_index(tensor, channels):
     '''
     Calculates the PLI over trials
@@ -61,6 +63,8 @@ def phase_lag_index(tensor, channels):
 
     plot_matrix(pli_matrix, channels)
     plot_over_trials()
+
+    return
 
 def surface_laplacian(tensor, channels, fs):
     '''
@@ -143,6 +147,7 @@ def topology_viz(tensor_a, tensor_b, channels, fs, time_divisions=5):
     # # Create an animated topomap
     # anim = evoked.animate_topomap(frame_rate=5, time_unit='s', extrapolate='head')
     # plt.show()
+    return
 
 def ae_correlation(tensor, channels):
     '''
@@ -169,6 +174,14 @@ def ae_correlation(tensor, channels):
 
     plot_matrix(ae_matrix, channels)
 
+    return
+
+def power_coupling(tensor, channels):
+    '''
+    trial-to-trial power coupling
+    '''
+
+
 
 
 def main(dict, band, fs):
@@ -178,12 +191,18 @@ def main(dict, band, fs):
 
     channels = ['CP3', 'C3', 'F5', 'PO3', 'PO4', 'F6', 'C4', 'CP4']
 
+    ## spatial filters
     # car_tensor = common_av_reference(dict[band])
     # laplacian_tensor = surface_laplacian(dict[band], channels, fs)
     # topology_viz(dict[band], laplacian_tensor, channels, fs)
 
+    ## phase connectivity
     # phase_lag_index(dict[band], channels)
+
+    ## power correlation
     ae_correlation(dict[band], channels)
+    # power_coupling(dict[band], channels)
+
 
 if __name__ == '__main__':
     main()

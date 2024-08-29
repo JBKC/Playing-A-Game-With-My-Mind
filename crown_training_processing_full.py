@@ -335,35 +335,10 @@ def main():
 
     ### now have signals labelled by class (left vs right)
 
-    # filters & feature extraction
-    feature_array = crown_full_feature_extraction.main(X1, X2)
+    ## send to crown_full_feature_extraction for filters & feature extraction
+    crown_full_feature_extraction.main(X1, X2)
 
     #######################
-
-    # pass data through spatial filters using CSP
-    # X1_csp, X2_csp, W = spatial_filter(X1=X1_filt, X2=X2_filt)
-
-    # # get Power Spectral Densities from spatially filtered data
-    # freqs, P1 = compute_psd(X1_csp)
-    # _, P2 = compute_psd(X2_csp)
-    #
-    # # get Log Variance
-    # L1 = logvar(X1_csp)
-    # L2 = logvar(X2_csp)
-    #
-    # _, P2_raw = compute_psd(X2)
-    #
-    # plot_psd(freqs_raw, P1_raw, P2_raw, CSP=False)
-    # plot_psd(freqs, P1, P2, CSP=True)
-    # bar_logvar(L1,L2)
-    # scatter_logvar(L1,L2)
-    #
-    # print(f'Class 1 model input shape: {L1.shape}')
-    # print(f'Class 2 model input shape: {L2.shape}')
-    #
-    #
-    # # return log variance and spatial filters as input into models
-    # return L1, L2, W
 
 
 if __name__ == '__main__':
