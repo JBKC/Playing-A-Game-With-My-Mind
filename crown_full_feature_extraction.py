@@ -6,6 +6,8 @@ import scipy.io
 import coherence_analysis
 import mne
 from mne.preprocessing import compute_current_source_density
+import torch
+from kymatio.torch import Scattering1D
 
 
 def normalise(signal):
@@ -72,6 +74,49 @@ def plot_fft(freqs, fft):
     plt.tight_layout()
     plt.show()
 
+def wavelet_scattering(X, bands, fs):
+    '''
+    Perform continuous wavelet transform to filter signals into frequency bands
+    '''
+
+    # dictionary of scattering coefficients for each band
+    band_coeffs = {band: [] for band in bands}
+
+    n_samples, n_channels, n_samples = X.shape
+
+    # find max and min frequency in bands
+    max_freq = np.max([v for v in bands.values()])
+    min_freq = np.min([v for v in bands.values()])
+
+    # set number of decomposition octaves (J) and frequency resolution (Q)
+    J = int(np.log2(fs / min_freq))
+    Q = 8
+
+    scattering = Scattering1D(J, n_samples, Q)      # create scattering object
+
+    # apply scattering to each channel
+    for channel in range(n_channels):
+        coeffs = scattering(X[:, channel, :].unsqueeze(1))
+
+        # Get the center frequencies of the wavelets
+        freqs = scattering.meta()['xi']
+        freqs_hz = freqs * fs / (2 * np.pi)
+
+        # Extract coefficients for each band
+        for band, freq_range in bands.items():
+            band_mask = (freqs_hz >= freq_range[0]) & (freqs_hz <= freq_range[1])
+            band_coeffs = coeffs[:, band_mask, :]
+            band_coeffs[band].append(band_coeffs)
+
+    # Convert lists to tensors
+    for band in bands:
+        band_coeffs[band] = torch.cat(band_coeffs[band], dim=1)
+
+    return band_coeffs
+
+
+    return
+
 def main(X1, X2):
     '''
     X1 = signals for right side motor imagery
@@ -121,12 +166,15 @@ def main(X1, X2):
     fs = 256
 
     bands = {
-        # 'delta': [0.5, 4],
+        'delta': [0.5, 4],
         'theta': [4, 8],
         'alpha': [8, 12],
         'beta': [12, 30],
         'gamma': [30, 50],
     }
+
+    ### methods for extracting EEG frequency bands
+    wavelet_scattering(X=X1, bands=bands, fs=fs)
 
     # dict_X1 = fir_method(X1)
     # dict_X2 = fir_method(X2)
@@ -134,7 +182,7 @@ def main(X1, X2):
     focus_band = 'gamma'
 
     ##### calculate coherence between different channels for each class
-    X1_coh = coherence_analysis.main(dict=dict_X1, band=focus_band, fs=fs)
+    # X1_coh = coherence_analysis.main(dict=dict_X1, band=focus_band, fs=fs)
     # X2_coh = coherence_analysis.main(dict=dict_X2, band=focus_band, fs=fs)
 
     # PSD

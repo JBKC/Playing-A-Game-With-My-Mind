@@ -11,6 +11,7 @@ import mne
 from mne.channels import make_standard_montage
 
 
+
 def plot_matrix(matrix, channels):
     plt.figure(figsize=(6, 6))  # Set the figure size
     plt.imshow(matrix, cmap='coolwarm', interpolation='nearest')  # Plot the array
