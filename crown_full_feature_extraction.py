@@ -83,7 +83,7 @@ def plot_wavelet(X, filt_dict, bands, fs):
     channel = 2
 
     n_bands = len(bands)
-    fig, axs = plt.subplots(n_bands + 1, 2, figsize=(10, (n_bands + 1)), sharex='col')
+    fig, axs = plt.subplots(n_bands + 1, 2, figsize=(10, (n_bands + 1)))
 
     time = np.arange(X.shape[2]) / fs
 
@@ -158,7 +158,7 @@ def wavelet_transform_dwt(X, fs, bands, wavelet='db4'):
         for trial in range(n_trials):
             for channel in range(n_channels):
                 signal = X[trial, channel, :]
-                coeffs = pywt.wavedec(signal, wavelet, level=level)
+                coeffs = pywt.wavedec(signal, wavelet, level=level)     # returns list of lists
                 filtered_signal = reconstruct(coeffs=coeffs, freqs=freqs, octaves=octaves)
                 filt_dict[band][trial, channel, :] = filtered_signal[:n_samples]
 
