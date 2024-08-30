@@ -4,6 +4,7 @@ from scipy.signal import butter, filtfilt
 import matplotlib.pyplot as plt
 import scipy.io
 import pywt
+import emd_analysis
 import coherence_analysis
 import mne
 from mne.preprocessing import compute_current_source_density
@@ -280,7 +281,7 @@ def main(X1, X2):
     ### Methods for extracting EEG frequency bands
     # 1. DWT
     X1_dict = wavelet_transform_dwt(X=X1, fs=fs)
-    # X2_dict = wavelet_transform_dwt(X=X2, fs=fs)
+    X2_dict = wavelet_transform_dwt(X=X2, fs=fs)
 
     # 2. FIR filter
     # X1_dict = fir_method(X=X1, fs=fs, bands=bands)
@@ -289,10 +290,14 @@ def main(X1, X2):
     # filter out power line noise
     index = -1      # which octave of DWT to apply filter to
     X1_dict = iir_notch(dict=X1_dict, fs=fs, freq=50, index=index)
+    X2_dict = iir_notch(dict=X2_dict, fs=fs, freq=50, index=index)
 
-    plot_wavelet(X=X1, filt_dict=X1_dict, fs=fs)
+    # plot_wavelet(X=X1, filt_dict=X1_dict, fs=fs)
 
+    # empirical mode decomposition
+    emd_analysis.main(X1_dict)
 
+    #########################
 
     ### Coherence analysis: note - must use FIR filter method
 
