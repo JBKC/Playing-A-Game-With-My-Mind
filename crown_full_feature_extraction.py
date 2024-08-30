@@ -3,6 +3,7 @@ import numpy as np
 from scipy.signal import butter, filtfilt
 import matplotlib.pyplot as plt
 import scipy.io
+import pywt
 import coherence_analysis
 import mne
 from mne.preprocessing import compute_current_source_density
@@ -74,48 +75,30 @@ def plot_fft(freqs, fft):
     plt.tight_layout()
     plt.show()
 
-def wavelet_scattering(X, bands, fs):
+def wavelet_transform(X, fs, wavelet='db4'):
     '''
-    Perform continuous wavelet transform to filter signals into frequency bands
+    Decompose signals into EEG frequency bands using DWT
     '''
 
-    # dictionary of scattering coefficients for each band
-    band_coeffs = {band: [] for band in bands}
+    n_trials, n_channels, n_samples = X.shape
 
-    n_samples, n_channels, n_samples = X.shape
+    dwt_coeffs = []
 
-    # find max and min frequency in bands
-    max_freq = np.max([v for v in bands.values()])
-    min_freq = np.min([v for v in bands.values()])
+    # Calculate the maximum decomposition level if not provided
+    level = pywt.dwt_max_level(X.shape[-1], wavelet)
 
-    # set number of decomposition octaves (J) and frequency resolution (Q)
-    J = int(np.log2(fs / min_freq))
-    Q = 8
+    # Perform the DWT
+    for trial in range(n_trials):
+        for channel in range(n_channels):
+            coeffs = pywt.wavedec(X[trial, channel, :], wavelet, level=level)
+            dwt_coeffs.append(coeffs)
 
-    scattering = Scattering1D(J, n_samples, Q)      # create scattering object
+    print(dwt_coeffs)
+    print(level)
 
-    # apply scattering to each channel
-    for channel in range(n_channels):
-        coeffs = scattering(X[:, channel, :].unsqueeze(1))
+    return dwt_coeffs
 
-        # Get the center frequencies of the wavelets
-        freqs = scattering.meta()['xi']
-        freqs_hz = freqs * fs / (2 * np.pi)
-
-        # Extract coefficients for each band
-        for band, freq_range in bands.items():
-            band_mask = (freqs_hz >= freq_range[0]) & (freqs_hz <= freq_range[1])
-            band_coeffs = coeffs[:, band_mask, :]
-            band_coeffs[band].append(band_coeffs)
-
-    # Convert lists to tensors
-    for band in bands:
-        band_coeffs[band] = torch.cat(band_coeffs[band], dim=1)
-
-    return band_coeffs
-
-
-    return
+    
 
 def main(X1, X2):
     '''
@@ -174,7 +157,7 @@ def main(X1, X2):
     }
 
     ### methods for extracting EEG frequency bands
-    wavelet_scattering(X=X1, bands=bands, fs=fs)
+    wavelet_transform(X=X1, fs=fs, wavelet='db4')
 
     # dict_X1 = fir_method(X1)
     # dict_X2 = fir_method(X2)
