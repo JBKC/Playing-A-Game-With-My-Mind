@@ -75,17 +75,20 @@ def plot_fft(freqs, fft):
     plt.tight_layout()
     plt.show()
 
+
 def plot_wavelet(X, filt_dict, bands, fs):
 
-    # plot arbitrary signal for comparison
+    # plot arbitrary signal
     trial = 12
-    channel = 0
+    channel = 2
 
     n_bands = len(bands)
     fig, axs = plt.subplots(n_bands + 1, 2, figsize=(10, (n_bands + 1)), sharex='col')
 
+    time = np.arange(X.shape[2]) / fs
+
     # Plot original signal
-    axs[0, 0].plot(X[trial, channel, :])
+    axs[0, 0].plot(time, X[trial, channel, :])
     axs[0, 0].set_title('Original Signal')
     axs[0, 0].set_ylabel('Amplitude')
 
@@ -94,11 +97,11 @@ def plot_wavelet(X, filt_dict, bands, fs):
     axs[0, 1].plot(f, psd)
     axs[0, 1].set_title('Power Spectral Density')
     axs[0, 1].set_ylabel('PSD')
-    axs[0, 1].set_xlim(0, 50)  # Limit x-axis to 0-50 Hz
+    axs[0, 1].set_xlim(0, 50)
 
     for i, (band_name, band_data) in enumerate(filt_dict.items(), start=1):
         # Plot filtered signal
-        axs[i, 0].plot(band_data[trial, channel, :])
+        axs[i, 0].plot(time, band_data[trial, channel, :])
         axs[i, 0].set_title(f'{band_name.capitalize()} Band ({bands[band_name][0]}-{bands[band_name][1]} Hz)')
         axs[i, 0].set_ylabel('Amplitude')
 
@@ -106,22 +109,17 @@ def plot_wavelet(X, filt_dict, bands, fs):
         f, psd = scipy.signal.welch(band_data[trial, channel, :], fs, nperseg=1024)
         axs[i, 1].plot(f, psd)
         axs[i, 1].set_ylabel('PSD')
-        axs[i, 1].set_xlim(0, 50)  # Limit x-axis to 0-50 Hz
+        axs[i, 1].set_xlim(0, 50)
 
-    axs[-1, 0].set_xlabel('Samples')
+    axs[-1, 0].set_xlabel('Time (s)')
     axs[-1, 1].set_xlabel('Frequency (Hz)')
     plt.tight_layout()
     plt.show()
 
-def wavelet_transform(X, fs, bands, wavelet='db4'):
+def wavelet_transform_dwt(X, fs, bands, wavelet='db4'):
     '''
     Decompose signals into EEG frequency bands using DWT
     '''
-
-    def dwt(signal, level):
-
-        # Perform the DWT & get coefficients
-        return pywt.wavedec(signal, wavelet, level=level)
 
     def reconstruct(coeffs, freqs, octaves):
         '''
@@ -137,7 +135,7 @@ def wavelet_transform(X, fs, bands, wavelet='db4'):
                 new_coeffs[level - i] = coeffs[level - i]
 
         # Reconstruct the signal
-        reconstructed = pywt.waverec(new_coeffs, 'db4')
+        reconstructed = pywt.waverec(new_coeffs, wavelet=wavelet)
 
         return reconstructed
 
@@ -160,13 +158,41 @@ def wavelet_transform(X, fs, bands, wavelet='db4'):
         for trial in range(n_trials):
             for channel in range(n_channels):
                 signal = X[trial, channel, :]
-                coeffs = dwt(signal=signal, level=level)
+                coeffs = pywt.wavedec(signal, wavelet, level=level)
                 filtered_signal = reconstruct(coeffs=coeffs, freqs=freqs, octaves=octaves)
                 filt_dict[band][trial, channel, :] = filtered_signal[:n_samples]
 
     plot_wavelet(X=X, filt_dict=filt_dict, fs=fs, bands=bands)
 
     return
+
+def wavelet_transform_cwt(X, fs, bands, wavelet='morl'):
+    '''
+    Decompose signals into EEG frequency bands using CWT
+    '''
+    n_trials, n_channels, n_samples = X.shape
+    filt_dict = {}              # dictionary for saving the filtered signals
+
+    for band_name, (low_freq, high_freq) in bands.items():
+        print(f"Processing {band_name} band...")
+
+        # Calculate scales for this frequency band
+        freqs = np.linspace(low_freq, high_freq, num=50)
+        scales = (fs * pywt.central_frequency(wavelet)) / freqs
+
+        filt_dict[band_name] = np.zeros((n_trials, n_channels, n_samples))
+
+        for trial in range(n_trials):
+            for channel in range(n_channels):
+                signal = X[trial, channel, :]
+                # perform CWT
+                coef, _ = pywt.cwt(signal, scales, wavelet, sampling_period=1/fs)
+                # Reconstruct the signal for this band
+                filt_dict[band_name][trial, channel, :] = np.real(np.sum(coef, axis=0))
+
+    plot_wavelet(X, filt_dict, bands, fs)
+
+    return filt_dict
     
 
 def main(X1, X2):
@@ -226,8 +252,9 @@ def main(X1, X2):
     }
 
     ### methods for extracting EEG frequency bands
-    # 1. DWT
-    wavelet_transform(X=X1, fs=fs, bands=bands, wavelet='db4')
+    # 1. DWT / CWT
+    wavelet_transform_dwt(X=X1, fs=fs, bands=bands)
+    # wavelet_transform_cwt(X=X1, fs=fs, bands=bands)
 
 
     # 2. FIR filter
