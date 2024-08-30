@@ -36,11 +36,33 @@ def compute_fft(dict, band, fs):
 
     return freqs, result
 
+def iir_notch(dict, fs, freq, index, Q=30):
+    '''
+    Infinite impulse response filter
+    '''
+
+    # select band of interest
+    k, X = list(dict.items())[index]
+    n_trials, n_channels, _ = X.shape
+
+    w0 = freq / (fs/2)                          # frequency to remove
+    b, a = scipy.signal.iirnotch(w0, Q)
+
+    X_filt = np.zeros_like(X)
+
+    for i in range(n_trials):
+        for j in range(n_channels):
+            X_filt[i, j, :] = scipy.signal.filtfilt(b, a, X[i, j, :])
+
+    dict[k] = X_filt
+
+    return dict
+
 def fir_method(X, fs, bands, numtaps=101):
     '''
     initial attempt - use FIR filter to split signals into frequency bands
     :params: input tensor X for a single class, of shape (n_trials, n_channels, n_samples)
-    :returns:
+    :returns: dictionary of tensors containing each frequency band
     '''
 
     # create dictionary of filtered tensor
@@ -70,6 +92,7 @@ def fir_method(X, fs, bands, numtaps=101):
         # plot_phase_response(coeffs, fs)
 
     return dict
+
 
 def plot_freq_response(coeffs,fs):
 
@@ -118,33 +141,30 @@ def plot_wavelet(X, filt_dict, fs):
     channel = 2
 
     n_bands = len(filt_dict)
-    fig, axs = plt.subplots(n_bands + 1, 2, figsize=(10, (n_bands + 1)))
+    fig, axs = plt.subplots(n_bands + 1, 2, figsize=(10, 1.5 * (n_bands + 1)))
 
     time = np.arange(X.shape[2]) / fs
 
     # Plot original signal
     axs[0, 0].plot(time, X[trial, channel, :])
     axs[0, 0].set_title('Original Signal')
-    axs[0, 0].set_ylabel('Amplitude')
 
     # Plot original signal's PSD
     f, psd = scipy.signal.welch(X[trial, channel, :], fs, nperseg=X.shape[-1], window='hann')
     axs[0, 1].plot(f, psd)
     axs[0, 1].set_title('Power Spectral Density')
     axs[0, 1].set_ylabel('PSD')
-    axs[0, 1].set_xlim(0, 50)
+    axs[0, 1].set_xlim(0, 64)
 
     for i, (band_name, band_data) in enumerate(filt_dict.items(), start=1):
         # Plot filtered signal
         axs[i, 0].plot(time, band_data[trial, channel, :])
-        axs[i, 0].set_title(f'{band_name.capitalize()} Band ({band_name} Hz)')
-        axs[i, 0].set_ylabel('Amplitude')
+        axs[i, 0].set_title(f'{band_name}')
 
         # Plot filtered signal's PSD
         f, psd = scipy.signal.welch(band_data[trial, channel, :], fs, nperseg=1024)
         axs[i, 1].plot(f, psd)
-        axs[i, 1].set_ylabel('PSD')
-        axs[i, 1].set_xlim(0, 50)
+        axs[i, 1].set_xlim(0, 64)
 
     axs[-1, 0].set_xlabel('Time (s)')
     axs[-1, 1].set_xlabel('Frequency (Hz)')
@@ -183,8 +203,8 @@ def wavelet_transform_dwt(X, fs, wavelet='db4'):
     # get frequency range of each octave
     octaves = [(fs / (2 ** (j + 1)), fs / (2 ** j)) for j in range(1, n_levels + 1)]
 
-    # take octaves of interest
-    octaves = octaves[-n_octaves:]
+    # take octaves of interest & reverse order
+    octaves = octaves[-n_octaves:][::-1]
     print(octaves)
 
     # create dictionary to store filtered signals for each octave
@@ -206,9 +226,7 @@ def wavelet_transform_dwt(X, fs, wavelet='db4'):
                 filt = reconstruct(coeffs, level)
                 filt_dict[band_name][trial, channel, :] = filt[:n_samples]
 
-    plot_wavelet(X=X, filt_dict=filt_dict, fs=fs)
-
-    return
+    return filt_dict
 
 def wavelet_transform_cwt(X, fs, bands, wavelet='morl'):
     '''
@@ -261,14 +279,22 @@ def main(X1, X2):
 
     ### Methods for extracting EEG frequency bands
     # 1. DWT
-    wavelet_transform_dwt(X=X1, fs=fs)
+    X1_dict = wavelet_transform_dwt(X=X1, fs=fs)
+    # X2_dict = wavelet_transform_dwt(X=X2, fs=fs)
 
     # 2. FIR filter
+    # X1_dict = fir_method(X=X1, fs=fs, bands=bands)
+    # X2_dict = fir_method(X=X2, fs=fs, bands=bands)
 
-    # dict_X1 = fir_method(X=X1, fs=fs, bands=bands)
-    # dict_X2 = fir_method(X=X2, fs=fs, bands=bands)
+    # filter out power line noise
+    index = -1      # which octave of DWT to apply filter to
+    X1_dict = iir_notch(dict=X1_dict, fs=fs, freq=50, index=index)
 
-    ### Coherence analysis
+    plot_wavelet(X=X1, filt_dict=X1_dict, fs=fs)
+
+
+
+    ### Coherence analysis: note - must use FIR filter method
 
     focus_band = 'gamma'
 
