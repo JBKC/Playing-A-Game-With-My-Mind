@@ -36,6 +36,41 @@ def compute_fft(dict, band, fs):
 
     return freqs, result
 
+def fir_method(X, fs, bands, numtaps=101):
+    '''
+    initial attempt - use FIR filter to split signals into frequency bands
+    :params: input tensor X for a single class, of shape (n_trials, n_channels, n_samples)
+    :returns:
+    '''
+
+    # create dictionary of filtered tensor
+    dict = {}
+
+    for k, v in bands.items():
+        # normalise cutoffs to nyquist frequencies
+        cutoffs = [2 * v[0] / fs, 2 * v[1] / fs]         # normalise to nyquist
+        # get FIR filter coefficients using window method
+        coeffs = scipy.signal.firwin(numtaps=numtaps, cutoff=cutoffs, pass_zero=False, window='hann')
+
+        X_fir = np.zeros_like(X)
+
+        # apply filter to X
+        for i in range(X.shape[0]):
+            for j in range(X.shape[1]):
+                # normalise signal
+                X[i, j, :] = normalise(X[i, j, :])
+                # apply filter
+                X_fir[i, j, :] = scipy.signal.lfilter(coeffs, 1.0, X[i, j, :])
+
+
+        # add to dictionary of tensors
+        dict[k] = X_fir
+
+        # plot_freq_response(coeffs, fs)
+        # plot_phase_response(coeffs, fs)
+
+    return dict
+
 def plot_freq_response(coeffs,fs):
 
     # plot the filter response (frequency vs amplitude)
@@ -76,13 +111,13 @@ def plot_fft(freqs, fft):
     plt.show()
 
 
-def plot_wavelet(X, filt_dict, bands, fs):
+def plot_wavelet(X, filt_dict, fs):
 
     # plot arbitrary signal
     trial = 12
     channel = 2
 
-    n_bands = len(bands)
+    n_bands = len(filt_dict)
     fig, axs = plt.subplots(n_bands + 1, 2, figsize=(10, (n_bands + 1)))
 
     time = np.arange(X.shape[2]) / fs
@@ -102,7 +137,7 @@ def plot_wavelet(X, filt_dict, bands, fs):
     for i, (band_name, band_data) in enumerate(filt_dict.items(), start=1):
         # Plot filtered signal
         axs[i, 0].plot(time, band_data[trial, channel, :])
-        axs[i, 0].set_title(f'{band_name.capitalize()} Band ({bands[band_name][0]}-{bands[band_name][1]} Hz)')
+        axs[i, 0].set_title(f'{band_name.capitalize()} Band ({band_name} Hz)')
         axs[i, 0].set_ylabel('Amplitude')
 
         # Plot filtered signal's PSD
@@ -116,53 +151,62 @@ def plot_wavelet(X, filt_dict, bands, fs):
     plt.tight_layout()
     plt.show()
 
-def wavelet_transform_dwt(X, fs, bands, wavelet='db4'):
+def wavelet_transform_dwt(X, fs, wavelet='db4'):
     '''
-    Decompose signals into EEG frequency bands using DWT
+    Decompose signals into EEG frequency bands (octaves) using DWT
     '''
 
-    def reconstruct(coeffs, freqs, octaves):
+    def reconstruct(coeffs, level):
         '''
         Reconstruct signal into its bands
+        :params: list of DWT coefficients for each level, coefficients level of interest
         '''
 
-        # Create a copy of coefficients and set all to zero
+        # create array of new_coefficients
         new_coeffs = [np.zeros_like(c) for c in coeffs]
 
-        # Find levels that correspond to the desired frequency band
-        for i, (low, high) in enumerate(octaves):
-            if (freqs[0] <= high and freqs[-1] >= low):
-                new_coeffs[level - i] = coeffs[level - i]
+        # set frequency range of interest to non-zero
+        new_coeffs[level] = coeffs[level]
 
-        # Reconstruct the signal
-        reconstructed = pywt.waverec(new_coeffs, wavelet=wavelet)
-
-        return reconstructed
+        # reconstruct the signal
+        return pywt.waverec(new_coeffs, wavelet=wavelet)
 
     n_trials, n_channels, n_samples = X.shape
 
-    # create dictionary to store filtered signals for each band
-    filt_dict = {}
+    # get max decomposition level using minimum frequency that we're interested in
+    min_freq = 8            # 8Hz taken as the lower end of alpha range
+    n_levels = int(np.log2(fs / 2 / min_freq))
 
-    # get max decomposition level using minimum frequency we're interested in
-    min_freq = np.min([v for v in bands.values()])
-    level = int(np.log2(fs / 2 / min_freq))
+    # pick number of octaves - e.g. we want (8-16), (16-32), (32,64)
+    n_octaves = 3
 
     # get frequency range of each octave
-    octaves = [(fs / (2 ** (j + 1)), fs / (2 ** j)) for j in range(level + 1)]
+    octaves = [(fs / (2 ** (j + 1)), fs / (2 ** j)) for j in range(1, n_levels + 1)]
+
+    # take octaves of interest
+    octaves = octaves[-n_octaves:]
     print(octaves)
 
-    for band, freqs in bands.items():
-        filt_dict[band] = np.zeros_like(X)
+    # create dictionary to store filtered signals for each octave
+    filt_dict = {f'{low:.1f}-{high:.1f}Hz': np.zeros_like(X) for low, high in octaves}
 
-        for trial in range(n_trials):
-            for channel in range(n_channels):
-                signal = X[trial, channel, :]
-                coeffs = pywt.wavedec(signal, wavelet, level=level)     # returns list of lists
-                filtered_signal = reconstruct(coeffs=coeffs, freqs=freqs, octaves=octaves)
-                filt_dict[band][trial, channel, :] = filtered_signal[:n_samples]
+    # iterate through each signal (total = n_trials * n_channels)
+    for trial in range(n_trials):
+        for channel in range(n_channels):
+            # get DWT coefficients
+            coeffs = pywt.wavedec(X[trial, channel, :], wavelet, level=n_levels)
 
-    plot_wavelet(X=X, filt_dict=filt_dict, fs=fs, bands=bands)
+            # reconstruct the bands we want by iterating through octaves
+            for i, (low, high) in enumerate(octaves):
+                band_name = f'{low:.1f}-{high:.1f}Hz'
+
+                # convert levels to octaves (ie. first octave of interest == 2nd level)
+                level = i + (n_levels - n_octaves)
+                # reconstruct the signal
+                filt = reconstruct(coeffs, level)
+                filt_dict[band_name][trial, channel, :] = filt[:n_samples]
+
+    plot_wavelet(X=X, filt_dict=filt_dict, fs=fs)
 
     return
 
@@ -203,46 +247,10 @@ def main(X1, X2):
     3rd dimension is the individual signal data
     '''
 
-    def fir_method(X, numtaps=101):
-        '''
-        initial attempt - use FIR filter to split signals into frequency bands
-        :params: input tensor X for a single class, of shape (n_trials, n_channels, n_samples)
-        :returns:
-        '''
-
-        # create dictionary of filtered tensor
-        dict = {}
-
-        for k, v in bands.items():
-            # normalise cutoffs to nyquist frequencies
-            cutoffs = [2 * v[0] / fs, 2 * v[1] / fs]         # normalise to nyquist
-            # get FIR filter coefficients using window method
-            coeffs = scipy.signal.firwin(numtaps=numtaps, cutoff=cutoffs, pass_zero=False, window='hann')
-
-            X_fir = np.zeros_like(X)
-
-            # apply filter to X
-            for i in range(X.shape[0]):
-                for j in range(X.shape[1]):
-                    # normalise signal
-                    X[i, j, :] = normalise(X[i, j, :])
-                    # apply filter
-                    X_fir[i, j, :] = scipy.signal.lfilter(coeffs, 1.0, X[i, j, :])
-
-
-            # add to dictionary of tensors
-            dict[k] = X_fir
-
-            # plot_freq_response(coeffs, fs)
-            # plot_phase_response(coeffs, fs)
-
-        return dict
-
     print(f'Class 1 trials: {X1.shape[0]}')
     print(f'Class 2 trials: {X2.shape[0]}')
 
     fs = 256
-
     bands = {
         'delta': [0.5, 4],
         'theta': [4, 8],
@@ -251,16 +259,16 @@ def main(X1, X2):
         'gamma': [30, 50],
     }
 
-    ### methods for extracting EEG frequency bands
-    # 1. DWT / CWT
-    wavelet_transform_dwt(X=X1, fs=fs, bands=bands)
-    # wavelet_transform_cwt(X=X1, fs=fs, bands=bands)
-
+    ### Methods for extracting EEG frequency bands
+    # 1. DWT
+    wavelet_transform_dwt(X=X1, fs=fs)
 
     # 2. FIR filter
-    # dict_X1 = fir_method(X1)
-    # dict_X2 = fir_method(X2)
 
+    # dict_X1 = fir_method(X=X1, fs=fs, bands=bands)
+    # dict_X2 = fir_method(X=X2, fs=fs, bands=bands)
+
+    ### Coherence analysis
 
     focus_band = 'gamma'
 
