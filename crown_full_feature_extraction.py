@@ -15,10 +15,15 @@ import torch
 from kymatio.torch import Scattering1D
 
 
-def normalise(signal):
+def normalise(tensor, zscore=True):
     # Z-score normalisation
-    # return (signal - np.mean(signal)) / np.std(signal)
-    return signal - np.mean(signal)
+    mean = np.mean(tensor, axis=-1, keepdims=True)
+    stdev = np.std(tensor, axis=-1, keepdims=True)
+
+    if zscore:
+        return (tensor - mean) / stdev
+    else:
+        return tensor - mean
 
 def compute_psd(dict, band):
 
@@ -272,6 +277,8 @@ def main(X1, X2):
     print(f'Class 1 trials: {X1.shape[0]}')
     print(f'Class 2 trials: {X2.shape[0]}')
 
+    n_trials, n_channels, n_samples = X1.shape
+
     fs = 256
     bands = {
         'delta': [0.5, 4],
@@ -280,6 +287,12 @@ def main(X1, X2):
         'beta': [12, 30],
         'gamma': [30, 50],
     }
+
+    # normalise signals
+    for trial in range(n_trials):
+        for channel in range(n_channels):
+            X1[trial, channel, :] = normalise(X1[trial, channel, :], zscore=True)
+            X2[trial, channel, :] = normalise(X2[trial, channel, :], zscore=True)
 
     ### Methods for extracting EEG frequency bands
     # 1. DWT
@@ -298,7 +311,9 @@ def main(X1, X2):
     # plot_wavelet(X=X1, filt_dict=X1_dict, fs=fs)
 
     # empirical mode decomposition
-    emd_analysis.main(X1, X1_dict, fs)
+    # emd_analysis.main(X1, X1_dict, fs)
+    emd_analysis.main(X2, X2_dict, fs)
+
 
     #########################
 

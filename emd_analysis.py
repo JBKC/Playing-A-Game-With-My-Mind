@@ -79,36 +79,34 @@ def emd_sift(X, dict, fs):
 
 def imf_power(X, dict, band):
     '''
-    :params: dict of format [band][trials][channels](n_samples, n_imfs)
-    :returns: dict of format [channel](n_imfs)
+    Calculate normalised power of first two IMFs for C3 and C4 channels across all trials
+    :param X: Original data array
+    :param dict: Dictionary of format {[band][trials][channels](n_samples, n_imfs)}
+    :param band: The frequency band to analyze
+    :returns: Dictionary of format {channel: [imf1_power, imf2_power]}
     '''
 
-    n_trials, _, _ = X.shape
-    channels = [1,6]            # C3, C4
+    channels = [1, 6]  # C3, C4
+    total_power = {ch: np.zeros(2) for ch in channels}  # Initialize for 2 IMFs
 
-    av_power = {ch: np.zeros(2) for ch in channels}
-
+    # calculate total power across all trials for each channel
     for _, trial_data in dict[band].items():
         for channel in channels:
             if channel in trial_data:
-
-                # extract imf data from channels of interest
                 imf = trial_data[channel]
-                # Compute power for each IMF
-                power = np.mean(np.square(imf), axis=0)  # average power for each IMF
-                # accumulate power over all trials
-                av_power[channel] += power
+                power = np.mean(np.square(imf[:, :2]), axis=0)
+                total_power[channel] += power
 
-    print(av_power[1].shape)
+    # normalise power across all trials for each IMF
+    normalised_power = {ch: np.zeros(2) for ch in channels}
+    for imf in range(2):
+        total_imf_power = sum(total_power[ch][imf] for ch in channels)
+        for ch in channels:
+            normalised_power[ch][imf] = total_power[ch][imf] / total_imf_power
 
-    # average power over trials
-    # power = {ch: power / n_trials for ch, power in av_power.items()}
+    return normalised_power
 
-    # return dictionary
-    return av_power
-
-
-def prepare_heatmap_data(power_dict, band):
+def prepare_heatmap_data(power_dict):
     '''
     Prepare data for heatmap from power dictionary.
 
@@ -125,10 +123,12 @@ def prepare_heatmap_data(power_dict, band):
         '''
 
         plt.figure(figsize=(8, 4))
-        sns.heatmap(data, annot=True, cmap='YlGnBu', cbar=True, fmt=".2f")
-        plt.title('Power of First 2 IMFs')
-        plt.xlabel('IMF')
-        plt.ylabel('Channel')
+        sns.heatmap(data.T, annot=True, cmap='YlGnBu', cbar=True, fmt=".2f",
+                    vmin=0, vmax=1, cbar_kws={'label': 'Normalized Power'})
+        plt.title('Normalized Power of First 2 IMFs')
+        plt.xlabel('Channel')
+        plt.ylabel('IMF')
+        plt.tight_layout()
         plt.show()
 
 
@@ -148,11 +148,13 @@ def prepare_heatmap_data(power_dict, band):
 
 def main(X, dict, fs):
 
-    band = f'32.0-64.0Hz'
+    # band = f'8.0-16.0Hz'
+    # band = f'16.0-32.0Hz'
+    band = f'16.0-32.0Hz'
 
     imf_dict = emd_sift(X, dict, fs)
     power_dict = imf_power(X, imf_dict, band)
-    prepare_heatmap_data(power_dict, band)
+    prepare_heatmap_data(power_dict)
 
     return
 
