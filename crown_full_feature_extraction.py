@@ -1,3 +1,6 @@
+'''
+8 channels in order: CP3, C3, F5, PO3, PO4, F6, C4, CP4
+'''
 
 import numpy as np
 from scipy.signal import butter, filtfilt

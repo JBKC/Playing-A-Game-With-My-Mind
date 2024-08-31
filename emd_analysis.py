@@ -1,7 +1,14 @@
+'''
+8 channels in order: CP3, C3, F5, PO3, PO4, F6, C4, CP4
+'''
+
 import numpy as np
 import matplotlib.pyplot as plt
 import emd
+import seaborn as sns
 import scipy.signal
+import pandas as pd
+
 
 def plot_imfs(X, imf_dict, fs):
     '''
@@ -15,7 +22,7 @@ def plot_imfs(X, imf_dict, fs):
 
     imf = imf_dict[band][trial][channel]
 
-    n_imfs = 3
+    n_imfs = 2
     fig, axs = plt.subplots(n_imfs + 1, 2, figsize=(10, 1.5 * (n_imfs + 1)))
     time = np.arange(X.shape[-1]) / fs
 
@@ -45,7 +52,6 @@ def plot_imfs(X, imf_dict, fs):
     plt.tight_layout()
     plt.show()
 
-
 def emd_sift(X, dict, fs):
     '''
     Use EMD to break signal into IMFs
@@ -53,7 +59,7 @@ def emd_sift(X, dict, fs):
 
     # parameters for emd.sift.sift()
     sd_thresh = 0.05
-    max_imfs = 5
+    max_imfs = 2
 
     imf_dict = {}
 
@@ -65,14 +71,88 @@ def emd_sift(X, dict, fs):
 
             for channel in range(X.shape[1]):
                 imf = emd.sift.sift(X[trial,channel,:], imf_opts={'sd_thresh': sd_thresh})
-                imf_dict[k][trial][channel] = imf
+                imf_dict[k][trial][channel] = imf[:, :max_imfs]
 
-    plot_imfs(X, imf_dict, fs)
+    # plot_imfs(X, imf_dict, fs)
 
+    return imf_dict
+
+def imf_power(X, dict, band):
+    '''
+    :params: dict of format [band][trials][channels](n_samples, n_imfs)
+    :returns: dict of format [channel](n_imfs)
+    '''
+
+    n_trials, _, _ = X.shape
+    channels = [1,7]            # C3, C4
+
+    av_power = {ch: np.zeros(2) for ch in channels}
+
+    for _, trial_data in dict[band].items():
+        for channel in channels:
+            if channel in trial_data:
+
+                # extract imf data from channels of interest
+                imf = trial_data[channel]
+                # Compute power for each IMF
+                power = np.mean(np.square(imf), axis=0)  # average power for each IMF
+                # accumulate power over all trials
+                av_power[channel] += power
+
+    print(av_power[1].shape)
+
+    # average power over trials
+    # power = {ch: power / n_trials for ch, power in av_power.items()}
+
+    # return dictionary
+    return av_power
+
+
+def prepare_heatmap_data(power_dict, band):
+    '''
+    Prepare data for heatmap from power dictionary.
+
+    :param power_dict: Dictionary containing average power
+    :param band: Band of interest
+    :returns: DataFrame suitable for heatmap
+    '''
+
+    def plot_heatmap():
+        '''
+        Plot heatmap for the power data.
+
+        :param data: DataFrame containing power values
+        '''
+
+        plt.figure(figsize=(8, 4))
+        sns.heatmap(data, annot=True, cmap='YlGnBu', cbar=True, fmt=".2f")
+        plt.title('Power of First 2 IMFs')
+        plt.xlabel('IMF')
+        plt.ylabel('Channel')
+        plt.show()
+
+
+    # Extract power values for C3 and C4
+    c3_power = power_dict[1]  # C3
+    c4_power = power_dict[7]  # C4
+
+    # Create a DataFrame
+    data = pd.DataFrame({
+        'IMF 1': [c3_power[0], c4_power[0]],
+        'IMF 2': [c3_power[1], c4_power[1]],
+    }, index=['C3', 'C4'])
+
+    plot_heatmap()
+
+    return
 
 def main(X, dict, fs):
 
-    emd_sift(X, dict, fs)
+    band = f'16.0-32.0Hz'
+
+    imf_dict = emd_sift(X, dict, fs)
+    power_dict = imf_power(X, imf_dict, band)
+    prepare_heatmap_data(power_dict, band)
 
     return
 
