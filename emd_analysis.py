@@ -84,7 +84,7 @@ def imf_power(X, dict, band):
     '''
 
     n_trials, _, _ = X.shape
-    channels = [1,7]            # C3, C4
+    channels = [1,6]            # C3, C4
 
     av_power = {ch: np.zeros(2) for ch in channels}
 
@@ -134,7 +134,7 @@ def prepare_heatmap_data(power_dict, band):
 
     # Extract power values for C3 and C4
     c3_power = power_dict[1]  # C3
-    c4_power = power_dict[7]  # C4
+    c4_power = power_dict[6]  # C4
 
     # Create a DataFrame
     data = pd.DataFrame({
@@ -148,7 +148,7 @@ def prepare_heatmap_data(power_dict, band):
 
 def main(X, dict, fs):
 
-    band = f'16.0-32.0Hz'
+    band = f'32.0-64.0Hz'
 
     imf_dict = emd_sift(X, dict, fs)
     power_dict = imf_power(X, imf_dict, band)

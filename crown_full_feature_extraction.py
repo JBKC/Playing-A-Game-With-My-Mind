@@ -293,7 +293,7 @@ def main(X1, X2):
     # filter out power line noise
     index = -1      # which octave of DWT to apply filter to
     X1_dict = iir_notch(dict=X1_dict, fs=fs, freq=50, index=index)
-    # X2_dict = iir_notch(dict=X2_dict, fs=fs, freq=50, index=index)
+    X2_dict = iir_notch(dict=X2_dict, fs=fs, freq=50, index=index)
 
     # plot_wavelet(X=X1, filt_dict=X1_dict, fs=fs)
 
