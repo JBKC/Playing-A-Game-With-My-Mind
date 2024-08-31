@@ -55,6 +55,7 @@ def plot_imfs(X, imf_dict, fs):
 def emd_sift(X, dict, fs):
     '''
     Use EMD to break signal into IMFs
+    :returns: dict of format {[band][trial][channel](imfs)}
     '''
 
     # parameters for emd.sift.sift()
@@ -104,12 +105,11 @@ def imf_power(X, dict, band):
         for ch in channels:
             normalised_power[ch][imf] = total_power[ch][imf] / total_imf_power
 
-    return normalised_power
+    return normalised_power, channels
 
-def prepare_heatmap_data(power_dict):
+def prepare_heatmap_data(power_dict, channels):
     '''
-    Prepare data for heatmap from power dictionary.
-
+    Prepare data for heatmap from power dictionary
     :param power_dict: Dictionary containing average power
     :param band: Band of interest
     :returns: DataFrame suitable for heatmap
@@ -117,8 +117,7 @@ def prepare_heatmap_data(power_dict):
 
     def plot_heatmap():
         '''
-        Plot heatmap for the power data.
-
+        Plot simple 2x2 grid for the power data
         :param data: DataFrame containing power values
         '''
 
@@ -131,10 +130,9 @@ def prepare_heatmap_data(power_dict):
         plt.tight_layout()
         plt.show()
 
-
-    # Extract power values for C3 and C4
-    c3_power = power_dict[1]  # C3
-    c4_power = power_dict[6]  # C4
+    # Extract power values for 2 channels
+    c3_power = power_dict[channels[0]]      # C3
+    c4_power = power_dict[channels[-1]]     # C4
 
     # Create a DataFrame
     data = pd.DataFrame({
@@ -152,9 +150,12 @@ def main(X, dict, fs):
     # band = f'16.0-32.0Hz'
     band = f'32.0-64.0Hz'
 
+    # get imfs
     imf_dict = emd_sift(X, dict, fs)
-    power_dict = imf_power(X, imf_dict, band)
-    prepare_heatmap_data(power_dict)
+    # get power for each imf
+    power_dict, channels = imf_power(X, imf_dict, band)
+    # plot power distribution
+    prepare_heatmap_data(power_dict, channels)
 
     return
 
