@@ -150,7 +150,7 @@ def main(X, dict, fs):
 
     # band = f'8.0-16.0Hz'
     # band = f'16.0-32.0Hz'
-    band = f'16.0-32.0Hz'
+    band = f'32.0-64.0Hz'
 
     imf_dict = emd_sift(X, dict, fs)
     power_dict = imf_power(X, imf_dict, band)

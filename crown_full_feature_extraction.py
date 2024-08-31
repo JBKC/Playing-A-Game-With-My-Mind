@@ -311,9 +311,8 @@ def main(X1, X2):
     # plot_wavelet(X=X1, filt_dict=X1_dict, fs=fs)
 
     # empirical mode decomposition
-    # emd_analysis.main(X1, X1_dict, fs)
-    emd_analysis.main(X2, X2_dict, fs)
-
+    emd_analysis.main(X1, X1_dict, fs)
+    # emd_analysis.main(X2, X2_dict, fs)
 
     #########################
 
