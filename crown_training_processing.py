@@ -129,7 +129,7 @@ def compute_psd(tensor):
     freqs of shape ceil(n_samples+1/2))
     '''
 
-    freqs, PSD = scipy.signal.welch(tensor, fs=265, axis=2, nperseg=tensor.shape[2])
+    freqs, PSD = scipy.signal.welch(tensor, fs=256, axis=2, nperseg=tensor.shape[2])
 
     return np.array(freqs), np.array(PSD)
 

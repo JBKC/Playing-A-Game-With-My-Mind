@@ -172,14 +172,14 @@ def main(X1,X2):
 
     X1_csp, X2_csp, W = spatial_filter(X1,X2)
 
-    # # get Power Spectral Densities from spatially filtered data
-    # freqs, P1 = compute_psd(X1_csp)
-    # _, P2 = compute_psd(X2_csp)
-    #
-    # # get Log Variance
-    # L1 = logvar(X1_csp)
-    # L2 = logvar(X2_csp)
-    #
+    # get Power Spectral Densities from spatially filtered data
+    freqs, P1 = compute_psd(X1_csp)
+    _, P2 = compute_psd(X2_csp)
+
+    # get Log Variance
+    L1 = logvar(P1)
+    L2 = logvar(P2)
+
     # freqs_raw, P1_raw = compute_psd(X1)
     # _, P2_raw = compute_psd(X2)
     #
