@@ -87,7 +87,7 @@ def imf_power(X, dict, band):
     :returns: Dictionary of format {channel: [imf1_power, imf2_power]}
     '''
 
-    channels = [1, 6]  # C3, C4
+    channels = [0, -1]
     total_power = {ch: np.zeros(2) for ch in channels}  # Initialize for 2 IMFs
 
     # calculate total power across all trials for each channel
@@ -144,14 +144,28 @@ def prepare_heatmap_data(power_dict, channels):
 
     return
 
-def main(X, dict, fs):
+def logvar(PSD):
+    '''
+    Inputs PSD, returns a single power value for the plot as the log variance of the PSD
+    :param PSD: shape (n_trials, n_channels, n_psd_points)
+    :return: log variance of shape (n_trials, n_channels)
+    '''
+
+    return np.log(np.var(PSD, axis=2))
+
+def main(X, dict, L_dict, fs):
 
     # band = f'8.0-16.0Hz'
     # band = f'16.0-32.0Hz'
-    band = f'32.0-64.0Hz'
+    # band = f'32.0-64.0Hz'
+
+    band = 'gamma'
 
     # get imfs
     imf_dict = emd_sift(X, dict, fs)
+
+    logvar
+
     # get power for each imf
     power_dict, channels = imf_power(X, imf_dict, band)
     # plot power distribution

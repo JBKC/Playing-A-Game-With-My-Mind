@@ -8,11 +8,14 @@ import matplotlib.pyplot as plt
 import scipy.io
 import pywt
 import emd_analysis
+import spatial_filtering
 import coherence_analysis
 import mne
 from mne.preprocessing import compute_current_source_density
 import torch
 from kymatio.torch import Scattering1D
+
+
 
 
 def normalise(tensor, zscore=True):
@@ -102,7 +105,6 @@ def fir_method(X, fs, bands, numtaps=101):
 
     return dict
 
-
 def plot_freq_response(coeffs,fs):
 
     # plot the filter response (frequency vs amplitude)
@@ -142,12 +144,11 @@ def plot_fft(freqs, fft):
     plt.tight_layout()
     plt.show()
 
-
-def plot_wavelet(X, filt_dict, fs):
+def plot_wavelet_decomp(X, filt_dict, fs):
 
     # plot arbitrary signal
-    trial = 12
-    channel = 2
+    trial = 23
+    channel = 0
 
     n_bands = len(filt_dict)
     fig, axs = plt.subplots(n_bands + 1, 2, figsize=(10, 1.5 * (n_bands + 1)))
@@ -261,10 +262,9 @@ def wavelet_transform_cwt(X, fs, bands, wavelet='morl'):
                 # Reconstruct the signal for this band
                 filt_dict[band_name][trial, channel, :] = np.real(np.sum(coef, axis=0))
 
-    plot_wavelet(X, filt_dict, bands, fs)
+    # plot_wavelet_decomp(X, filt_dict, bands, fs)
 
     return filt_dict
-    
 
 def main(X1, X2):
     '''
@@ -281,7 +281,7 @@ def main(X1, X2):
 
     fs = 256
     bands = {
-        'delta': [0.5, 4],
+        # 'delta': [0.5, 4],
         'theta': [4, 8],
         'alpha': [8, 12],
         'beta': [12, 30],
@@ -296,23 +296,29 @@ def main(X1, X2):
 
     ### Methods for extracting EEG frequency bands
     # 1. DWT
-    X1_dict = wavelet_transform_dwt(X=X1, fs=fs)
-    X2_dict = wavelet_transform_dwt(X=X2, fs=fs)
+    # X1_dict = wavelet_transform_dwt(X=X1, fs=fs)
+    # X2_dict = wavelet_transform_dwt(X=X2, fs=fs)
 
     # 2. FIR filter
-    # X1_dict = fir_method(X=X1, fs=fs, bands=bands)
-    # X2_dict = fir_method(X=X2, fs=fs, bands=bands)
+    X1_dict = fir_method(X=X1, fs=fs, bands=bands)
+    X2_dict = fir_method(X=X2, fs=fs, bands=bands)
 
     # filter out power line noise
     index = -1      # which octave of DWT to apply filter to
     X1_dict = iir_notch(dict=X1_dict, fs=fs, freq=50, index=index)
     X2_dict = iir_notch(dict=X2_dict, fs=fs, freq=50, index=index)
+    
+    plot_wavelet_decomp(X=X1, filt_dict=X1_dict, fs=fs)
 
-    # plot_wavelet(X=X1, filt_dict=X1_dict, fs=fs)
+    # apply spatial filters (electrodes --> discriminatory eigenvectors)
+
+    for k,_ in X1_dict.items():
+        print(k)
+        X1_dict[k], X2_dict[k] = spatial_filtering.main(X1_dict[k], X2_dict[k])
 
     # empirical mode decomposition
-    # emd_analysis.main(X1, X1_dict, fs)
-    emd_analysis.main(X2, X2_dict, fs)
+    emd_analysis.main(X1, X1_dict, fs)
+    # emd_analysis.main(X2, X2_dict, fs)
 
     #########################
 

@@ -401,8 +401,8 @@ def main():
     _, P2 = compute_psd(X2_csp)
 
     # get Log Variance
-    L1 = logvar(X1_csp)
-    L2 = logvar(X2_csp)
+    L1 = logvar(P1)
+    L2 = logvar(P2)
 
     freqs_raw, P1_raw = compute_psd(X1)
     _, P2_raw = compute_psd(X2)
