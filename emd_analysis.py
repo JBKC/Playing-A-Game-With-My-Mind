@@ -87,25 +87,28 @@ def imf_power(X, dict, band):
     :returns: Dictionary of format {channel: [imf1_power, imf2_power]}
     '''
 
-    channels = [0, -1]
-    total_power = {ch: np.zeros(2) for ch in channels}  # Initialize for 2 IMFs
+    channels = [0, 7]          # most discriminative eigenvectors
+    logvar = {ch: np.zeros(2) for ch in channels}  # Initialize for 2 IMFs
 
-    # calculate total power across all trials for each channel
-    for _, trial_data in dict[band].items():
-        for channel in channels:
-            if channel in trial_data:
-                imf = trial_data[channel]
-                power = np.mean(np.square(imf[:, :2]), axis=0)
-                total_power[channel] += power
+    # calculate PSD for each signal
+
+    # iterate over trials
+    for _, data in dict[band].items():
+        # iterate over channels
+        for ch in channels:
+            imf = data[ch]
+            # get PSD of each IMF
+            _, PSD = scipy.signal.welch(imf, fs=256, axis=0, nperseg=imf.shape[0])
+            logvar[ch] = np.log(np.var(PSD, axis=0))
 
     # normalise power across all trials for each IMF
-    normalised_power = {ch: np.zeros(2) for ch in channels}
+    normalised_logvar = {ch: np.zeros(2) for ch in channels}
     for imf in range(2):
-        total_imf_power = sum(total_power[ch][imf] for ch in channels)
+        total_imf_power = sum(logvar[ch][imf] for ch in channels)
         for ch in channels:
-            normalised_power[ch][imf] = total_power[ch][imf] / total_imf_power
+            normalised_logvar[ch][imf] = logvar[ch][imf] / total_imf_power
 
-    return normalised_power, channels
+    return normalised_logvar, channels
 
 def prepare_heatmap_data(power_dict, channels):
     '''
@@ -131,42 +134,31 @@ def prepare_heatmap_data(power_dict, channels):
         plt.show()
 
     # Extract power values for 2 channels
-    c3_power = power_dict[channels[0]]      # C3
-    c4_power = power_dict[channels[-1]]     # C4
+    c3_power = power_dict[channels[0]]
+    c4_power = power_dict[channels[-1]]
 
     # Create a DataFrame
     data = pd.DataFrame({
         'IMF 1': [c3_power[0], c4_power[0]],
         'IMF 2': [c3_power[1], c4_power[1]],
-    }, index=['C3', 'C4'])
+    }, index=['Eigenvalue 1', 'Eigvenvalue 2'])
 
     plot_heatmap()
 
     return
 
-def logvar(PSD):
-    '''
-    Inputs PSD, returns a single power value for the plot as the log variance of the PSD
-    :param PSD: shape (n_trials, n_channels, n_psd_points)
-    :return: log variance of shape (n_trials, n_channels)
-    '''
-
-    return np.log(np.var(PSD, axis=2))
-
-def main(X, dict, L_dict, fs):
+def main(X, dict, fs):
 
     # band = f'8.0-16.0Hz'
     # band = f'16.0-32.0Hz'
     # band = f'32.0-64.0Hz'
 
-    band = 'gamma'
+    band = 'beta'
 
     # get imfs
     imf_dict = emd_sift(X, dict, fs)
 
-    logvar
-
-    # get power for each imf
+    # get power log-variance for each imf
     power_dict, channels = imf_power(X, imf_dict, band)
     # plot power distribution
     prepare_heatmap_data(power_dict, channels)

@@ -308,7 +308,7 @@ def main(X1, X2):
     X1_dict = iir_notch(dict=X1_dict, fs=fs, freq=50, index=index)
     X2_dict = iir_notch(dict=X2_dict, fs=fs, freq=50, index=index)
     
-    plot_wavelet_decomp(X=X1, filt_dict=X1_dict, fs=fs)
+    # plot_wavelet_decomp(X=X1, filt_dict=X1_dict, fs=fs)
 
     # apply spatial filters (electrodes --> discriminatory eigenvectors)
 
